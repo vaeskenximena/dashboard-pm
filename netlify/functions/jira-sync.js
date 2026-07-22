@@ -59,15 +59,22 @@ exports.handler = async function (event) {
 
     let allIssues = [];
     let fieldNames = {};
-    let startAt = 0;
-    const maxResults = 100;
-    let total = Infinity;
+    let nextPageToken = null;
 
-    while (startAt < total && allIssues.length < 2000) {
-      const jiraUrl = `https://${config.dominio}/rest/api/3/search?jql=${encodeURIComponent(jql)}&startAt=${startAt}&maxResults=${maxResults}&fields=*all&expand=names`;
+    while (allIssues.length < 2000) {
+      const jiraUrl = `https://${config.dominio}/rest/api/3/search/jql`;
+      const body = {
+        jql,
+        maxResults: 100,
+        fields: ['*all'],
+        expand: 'names'
+      };
+      if (nextPageToken) body.nextPageToken = nextPageToken;
 
       const jiraResp = await fetch(jiraUrl, {
-        headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
+        method: 'POST',
+        headers: { 'Authorization': authHeader, 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
       });
 
       if (!jiraResp.ok) {
@@ -79,11 +86,11 @@ exports.handler = async function (event) {
       }
 
       const data = await jiraResp.json();
-      total = data.total;
       allIssues = allIssues.concat(data.issues || []);
       if (data.names && Object.keys(fieldNames).length === 0) fieldNames = data.names;
-      startAt += maxResults;
-      if (!data.issues || data.issues.length === 0) break;
+
+      if (data.isLast || !data.issues || data.issues.length === 0 || !data.nextPageToken) break;
+      nextPageToken = data.nextPageToken;
     }
 
     return {
