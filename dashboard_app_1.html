@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ══════════════════════════════════════════════
+// ⚠️  REEMPLAZÁ ESTOS DOS VALORES
+const SUPABASE_URL = 'https://qszzabybiieolnajaszk.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzenphYnliaWllb2xuYWphc3prIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNjUyMTQsImV4cCI6MjA5NjY0MTIxNH0.8If32to25vLkIvEP0NpaI1T9RDRLp_wP7DrI1Q5yJPA';
+// ══════════════════════════════════════════════
+(async () => {
+  const { createClient } = supabase;
+  const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; }
+  else { window._userEmail = session.user.email; }
+})();
+</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APP TU — Dashboard PM</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin:0; padding:0; }
+  body { font-family:'Segoe UI', system-ui, sans-serif; background:#f4f3ef; color:#1a1a18; min-height:100vh; }
+  .container { max-width: 1180px; margin:0 auto; padding: 1.75rem 1.5rem 3rem; }
+
+  /* Auth bar (protegida) */
+  #_auth-bar { display:flex; align-items:center; justify-content:space-between; padding:10px 24px; background:#fff; border-bottom:1px solid #e5e4de; font-size:13px; color:#7a7a72; position:sticky; top:0; z-index:100; }
+  .btn-logout { padding:5px 14px; border-radius:7px; border:1px solid #d0cfc8; background:#fff; font-size:12px; font-weight:600; cursor:pointer; color:#941818; font-family:inherit; }
+
+  .header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; flex-wrap:wrap; gap:12px; }
+  .header-left h1 { font-size:22px; font-weight:700; color:#1a1a18; letter-spacing:-0.01em; }
+  .header-left .subtitle { font-size:13px; color:#8a8578; margin-top:2px; }
+  .nav-btns { display:flex; gap:8px; flex-wrap:wrap; }
+  .nav-btn { padding:8px 14px; border-radius:8px; border:1px solid #e2e0d8; background:#fff; font-size:12.5px; font-weight:600; cursor:pointer; color:#5c584f; text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:border-color .15s,color .15s; }
+  .nav-btn:hover { border-color:#c8c6bc; color:#1a1a18; }
+  .btn-sync { background:#1558a0; border-color:#1558a0; color:#fff; font-weight:700; cursor:pointer; }
+  .btn-sync:hover { background:#1046a0; border-color:#1046a0; color:#fff; }
+  .btn-sync:disabled { opacity:0.6; cursor:wait; }
+  .sync-status { font-size:12px; color:#8a8578; margin:-4px 0 14px; min-height:16px; }
+  .sync-status.error { color:#a02020; }
+  .sync-status.ok { color:#2d7a27; }
+
+  /* Big numbers */
+  .bignums { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:1.5rem; }
+  .bn-card { background:#fff; border:1px solid #ece9e0; border-radius:12px; padding:16px 18px; position:relative; overflow:hidden; }
+  .bn-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--accent); opacity:.8; }
+  .bn-label { font-size:11.5px; color:#948e80; font-weight:600; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
+  .bn-num { font-size:28px; font-weight:800; color:var(--accent); letter-spacing:-0.02em; }
+  .bn-sub { font-size:11.5px; color:#a8a297; margin-top:2px; }
+
+  /* Chart cards */
+  .charts-grid { display:grid; grid-template-columns: 1.3fr 1fr; gap:16px; margin-bottom:1.5rem; }
+  .charts-grid-3 { display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:1.5rem; }
+  .chart-card { background:#fff; border:1px solid #ece9e0; border-radius:12px; padding:18px 20px; }
+  .chart-title { font-size:13px; font-weight:700; color:#3a3a38; margin-bottom:3px; }
+  .chart-sub { font-size:11.5px; color:#a8a297; margin-bottom:14px; }
+
+  .rank-row { display:flex; align-items:center; gap:10px; margin-bottom:9px; }
+  .rank-name { font-size:12.5px; color:#3a3a38; width:150px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
+  .rank-track { flex:1; background:#f0efe9; border-radius:6px; height:9px; overflow:hidden; }
+  .rank-fill { height:100%; border-radius:6px; }
+  .rank-pct { font-size:12px; font-weight:700; color:#3a3a38; width:38px; text-align:right; }
+
+  .donut-row { display:flex; align-items:center; gap:18px; }
+  .donut-wrap { position:relative; width:100px; height:100px; flex-shrink:0; }
+  .donut-center { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; }
+  .donut-pct { font-size:20px; font-weight:800; }
+  .donut-label { font-size:9.5px; color:#a8a297; }
+  .donut-legend { display:flex; flex-direction:column; gap:6px; }
+  .legend-item { display:flex; align-items:center; gap:6px; font-size:11.5px; color:#5c584f; }
+  .legend-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+  /* Filters */
+  .filter-bar { background:#fff; border:1px solid #ece9e0; border-radius:12px; padding:14px 18px; margin-bottom:1.25rem; display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+  .filter-group { display:flex; flex-direction:column; gap:4px; }
+  .filter-label { font-size:10.5px; font-weight:700; color:#948e80; text-transform:uppercase; letter-spacing:.04em; }
+  .filter-select { background:#faf9f5; border:1px solid #e2e0d8; border-radius:6px; padding:6px 10px; font-size:12.5px; font-family:inherit; color:#1a1a18; cursor:pointer; min-width:140px; }
+  .filter-actions { display:flex; gap:8px; margin-left:auto; }
+  .btn-filter { padding:7px 14px; border-radius:7px; border:none; background:#1a1a18; color:#fff; font-size:12px; cursor:pointer; font-family:inherit; font-weight:600; }
+  .btn-clear { padding:7px 14px; border-radius:7px; border:1px solid #e2e0d8; background:#fff; color:#5c584f; font-size:12px; cursor:pointer; font-family:inherit; }
+
+  /* Project cards */
+  .project-card { background:#fff; border:1px solid #ece9e0; border-radius:12px; margin-bottom:12px; overflow:hidden; }
+  .project-header { display:flex; align-items:center; justify-content:space-between; padding:13px 18px; background:#fafaf7; cursor:pointer; user-select:none; }
+  .project-header:hover { background:#f4f3ee; }
+  .project-name { font-weight:700; font-size:14px; display:flex; align-items:center; gap:8px; color:#1a1a18; }
+  .project-meta { font-size:12px; color:#948e80; display:flex; align-items:center; gap:12px; }
+  .project-pct { font-weight:700; }
+  .chevron { transition:transform .2s; display:inline-block; font-size:11px; color:#a8a297; }
+  .chevron.open { transform:rotate(180deg); }
+  .col-headers { display:grid; grid-template-columns:2fr 1.1fr 0.85fr 0.75fr 0.85fr 0.75fr; gap:8px; padding:8px 18px; background:#faf9f5; border-top:1px solid #f0efe9; font-size:10.5px; font-weight:700; color:#a8a297; text-transform:uppercase; letter-spacing:.04em; }
+  .item-row { display:grid; grid-template-columns:2fr 1.1fr 0.85fr 0.75fr 0.85fr 0.75fr; gap:8px; align-items:center; padding:9px 18px; border-top:1px solid #f5f4ee; font-size:12.5px; }
+  .item-pct { font-weight:800; font-size:12.5px; }
+  .item-row:hover { background:#fbfaf7; }
+  .body-section { display:none; }
+  .body-section.open { display:block; }
+  .badge { display:inline-block; padding:3px 9px; border-radius:999px; font-size:10.5px; font-weight:700; white-space:nowrap; }
+  .b-final{background:#d4f0e6;color:#0a5e42;} .b-progress{background:#ddeaf8;color:#1053a0;}
+  .b-pending{background:#fdefd4;color:#7a4800;} .b-blocked{background:#fde4e4;color:#941818;}
+  .text-muted{color:#948e80;}
+  .macro-section { padding:12px 18px 4px; border-top:1px solid #f0efe9; }
+  .macro-title { font-size:10.5px; font-weight:700; color:#a8a297; text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px; }
+  .macro-row { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid #f7f6f1; }
+  .macro-row:last-child { border-bottom:none; }
+  .macro-check { width:15px; height:15px; border-radius:4px; border:1.5px solid #cfccc2; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:10px; color:#fff; }
+  .macro-check.done { background:#2d7a27; border-color:#2d7a27; }
+  .macro-key { font-size:10.5px; color:#b0afa8; font-weight:600; width:52px; flex-shrink:0; }
+  .macro-name { font-size:12.5px; color:#3a3a38; flex:1; }
+  .macro-name.done { text-decoration:line-through; color:#a8a297; }
+  .macro-pct { font-size:11.5px; font-weight:800; width:38px; text-align:right; flex-shrink:0; }
+  .tipo-tag { font-size:10.5px; color:#a8a297; font-weight:600; }
+
+  .btn-perf { padding:8px 14px; border-radius:8px; border:1px solid #1558a0; background:#eaf1fa; color:#1558a0; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; flex-shrink:0; white-space:nowrap; transition:background .15s; }
+  .btn-perf:hover { background:#ddeaf8; }
+
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(20,20,15,0.45); z-index:1000; align-items:flex-start; justify-content:center; padding:3vh 16px; overflow-y:auto; }
+  .modal-overlay.open { display:flex; }
+  .modal-box { background:#f4f3ef; border-radius:16px; max-width:900px; width:100%; max-height:94vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.25); }
+  .modal-header { display:flex; align-items:flex-start; justify-content:space-between; padding:20px 24px; background:#fff; border-bottom:1px solid #ece9e0; border-radius:16px 16px 0 0; position:sticky; top:0; }
+  .modal-title { font-size:17px; font-weight:800; color:#1a1a18; }
+  .modal-sub { font-size:12px; color:#a8a297; margin-top:2px; }
+  .modal-close { border:none; background:#f0efe9; width:30px; height:30px; border-radius:50%; font-size:14px; cursor:pointer; color:#5c584f; flex-shrink:0; }
+  .modal-close:hover { background:#e5e3da; }
+  .modal-body { padding:20px 24px 24px; }
+  .perf-note { font-size:12px; color:#7a5c00; background:#fff8e0; border-radius:10px; padding:10px 14px; line-height:1.5; }
+
+  .last-updated { font-size:11.5px; color:#b0afa8; margin-top:1.5rem; text-align:right; }
+
+  @media (max-width:900px) {
+    .charts-grid, .charts-grid-3 { grid-template-columns:1fr; }
+    .col-headers, .item-row { grid-template-columns:1.6fr 0.9fr 0.8fr 0.7fr; }
+    .col-headers > *:nth-child(n+5), .item-row > *:nth-child(n+5) { display:none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="_auth-bar">
+  <span>📋 Dashboard PM &nbsp;·&nbsp; <strong id="_user-email" style="color:#1a1a18"></strong></span>
+  <button class="btn-logout" onclick="(async()=>{const {createClient}=supabase;const sb=createClient('https://qszzabybiieolnajaszk.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzenphYnliaWllb2xuYWphc3prIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNjUyMTQsImV4cCI6MjA5NjY0MTIxNH0.8If32to25vLkIvEP0NpaI1T9RDRLp_wP7DrI1Q5yJPA');await sb.auth.signOut();window.location.href='index.html';})()">Cerrar sesión</button>
+</div>
+<script>document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('_user-email');if(el&&window._userEmail)el.textContent=window._userEmail;});</script>
+
+<div class="container">
+  <div class="header">
+    <div class="header-left">
+      <h1>📱 APP TU</h1>
+      <div class="subtitle" id="dashdate"></div>
+    </div>
+    <div class="nav-btns">
+      <button class="nav-btn btn-sync" id="btn-sync" onclick="syncFromJira()">🔄 Sincronizar con Jira</button>
+      <a class="nav-btn" href="dashboard_web_2.html">🌐 WEB TU</a>
+      <a class="nav-btn" href="dashboard_productos.html">🧩 Productos Digitales</a>
+      <a class="nav-btn" href="dashboard_incidencias.html">🚨 Incidencias TU</a>
+      <a class="nav-btn" href="index.html">← Inicio</a>
+    </div>
+  </div>
+  <div class="sync-status" id="sync-status"></div>
+
+  <!-- BIG NUMBERS -->
+  <div class="bignums">
+    <div class="bn-card" style="--accent:#1558a0"><div class="bn-label">Proyectos en progreso</div><div class="bn-num" id="bn-proyectos">0</div><div class="bn-sub">de 9 proyectos totales</div></div>
+    <div class="bn-card" style="--accent:#941818"><div class="bn-label">En pausa / bloqueadas</div><div class="bn-num" id="bn-pausa">0</div><div class="bn-sub">actividades detenidas</div></div>
+    <div class="bn-card" style="--accent:#c47a00"><div class="bn-label">Vencen en 7 días</div><div class="bn-num" id="bn-vencen">0</div><div class="bn-sub">sin cerrar</div></div>
+    <div class="bn-card" style="--accent:#a02020"><div class="bn-label">Vencidas sin cerrar</div><div class="bn-num" id="bn-vencidas">0</div><div class="bn-sub">requieren atención</div></div>
+  </div>
+
+  <!-- % avance por épica -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">% de avance por proyecto (épica)</div>
+      <div class="chart-sub">Ítems en "Listo" sobre el total de cada proyecto</div>
+      <div id="rank-epicas"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Cantidad de tareas por proyecto</div>
+      <div class="chart-sub">% del volumen total de trabajo</div>
+      <div id="rank-volumen"></div>
+    </div>
+  </div>
+
+  <!-- Mejora continua + tarea tipo -->
+  <div class="charts-grid-3">
+    <div class="chart-card">
+      <div class="chart-title">Mejora Continua</div>
+      <div class="chart-sub" id="mc-sub"></div>
+      <div class="donut-row">
+        <div class="donut-wrap"><canvas id="donutMC" width="100" height="100"></canvas><div class="donut-center"><div class="donut-pct" id="mc-pct" style="color:#1558a0">0%</div><div class="donut-label">listo</div></div></div>
+        <div class="donut-legend" id="mc-legend"></div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Tareas (tipo "Tarea")</div>
+      <div class="chart-sub" id="tarea-sub"></div>
+      <div class="donut-row">
+        <div class="donut-wrap"><canvas id="donutTarea" width="100" height="100"></canvas><div class="donut-center"><div class="donut-pct" id="tarea-pct" style="color:#1558a0">0%</div><div class="donut-label">listo</div></div></div>
+        <div class="donut-legend" id="tarea-legend"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Carga de trabajo -->
+  <div class="chart-card" style="margin-bottom:1.5rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div class="chart-title">Carga de trabajo por persona</div>
+        <div class="chart-sub">Cantidad de ítems asignados (todos los tipos)</div>
+      </div>
+      <button class="btn-perf" onclick="openPerfModal()">📊 Performance equipo</button>
+    </div>
+    <div id="rank-carga"></div>
+  </div>
+
+  <!-- Modal Performance Equipo -->
+  <div class="modal-overlay" id="perf-modal-overlay" onclick="if(event.target===this) closePerfModal()">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">📊 Performance Equipo</div>
+          <div class="modal-sub">Medido a partir de los datos de Jira · APP TU</div>
+        </div>
+        <button class="modal-close" onclick="closePerfModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="bignums" style="margin-bottom:1.25rem;">
+          <div class="bn-card" style="--accent:#1558a0"><div class="bn-label">Tareas globales</div><div class="bn-num" id="perf-total">0</div><div class="bn-sub">todos los tipos</div></div>
+          <div class="bn-card" style="--accent:#a02020"><div class="bn-label">Vencidas sin cerrar</div><div class="bn-num" id="perf-vencidas">0</div><div class="bn-sub" id="perf-vencidas-sub"></div></div>
+          <div class="bn-card" style="--accent:#2d7a27"><div class="bn-label">Top cumplimiento</div><div class="bn-num" id="perf-top" style="font-size:16px;">—</div><div class="bn-sub" id="perf-top-sub"></div></div>
+        </div>
+
+        <div class="chart-card" style="margin-bottom:14px;">
+          <div class="chart-title">% de cumplimiento a tiempo por persona</div>
+          <div class="chart-sub">Tareas finalizadas antes o en la fecha de vencimiento, sobre el total con fecha comparable</div>
+          <div id="perf-cumplimiento"></div>
+        </div>
+
+        <div class="charts-grid-3" style="margin-bottom:14px;">
+          <div class="chart-card">
+            <div class="chart-title">Tareas vencidas por persona</div>
+            <div class="chart-sub">Sin cerrar, con fecha ya pasada</div>
+            <div id="perf-vencidas-persona"></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">Carga simultánea (WIP)</div>
+            <div class="chart-sub">Tareas "En curso" al mismo tiempo</div>
+            <div id="perf-wip"></div>
+          </div>
+        </div>
+
+        <div class="perf-note">
+          ⚠️ <b>Sobre "sin tareas asignadas":</b> Jira solo me dice quién <i>tiene</i> algo asignado, no la nómina completa de tu equipo. Para saber quién está en cero, pasame la lista completa de integrantes y la cruzo contra esto.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <div class="filter-label">Proyecto</div>
+      <select class="filter-select" id="f-epica"><option value="all">Todos</option></select>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Persona</div>
+      <select class="filter-select" id="f-persona"><option value="all">Todas</option></select>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Estado</div>
+      <select class="filter-select" id="f-estado">
+        <option value="all">Todos</option>
+        <option value="progress">En curso</option>
+        <option value="pending">Pendiente</option>
+        <option value="blocked">En pausa</option>
+        <option value="final">Finalizado</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Tipo</div>
+      <select class="filter-select" id="f-tipo">
+        <option value="all">Todos</option>
+        <option value="Tarea">Tarea</option>
+        <option value="Subtarea">Subtarea</option>
+        <option value="Mejora Continua">Mejora Continua</option>
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button class="btn-filter" onclick="applyFilters()">Aplicar</button>
+      <button class="btn-clear" onclick="clearFilters()">Limpiar</button>
+    </div>
+  </div>
+
+  <div id="projects-container"></div>
+  <div class="last-updated" id="last-updated"></div>
+</div>
+
+<script>
+let DATA = {"epics": [{"key": "DIG-224", "name": "Apple Pay", "estado": "En progreso", "responsable": "Sin asignar", "deadline": "", "total": 3, "listo": 0, "pct": 0, "items": [{"key": "DIG-227", "desc": "Análisis Front", "resp": "Koichi Nagasawa", "status": "progress", "estadoRaw": "En progreso", "pct": 50, "deadline": "22/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-226", "desc": "Analisis Back ", "resp": "Camila Montserrat Alderete González", "status": "progress", "estadoRaw": "En progreso", "pct": 50, "deadline": "22/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-223", "desc": "Análisis Tecnico", "resp": "Camila Montserrat Alderete González", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "22/07/2026", "inicio": "13/07/2026", "inicioSort": "2026-07-13", "tipo": "Tarea", "directChild": true}]}, {"key": "DIG-218", "name": "Migración Quarkus", "estado": "En progreso", "responsable": "Sin asignar", "deadline": "", "total": 16, "listo": 8, "pct": 50, "items": [{"key": "DIG-256", "desc": "Migrar los servicios de CDA para que apunten directamente a los microservicios.", "resp": "Sin asignar", "status": "pending", "estadoRaw": "BACKLOG", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-255", "desc": "Mover todos los archivos relacionados a CDA siguiendo la nueva estructura del proyecto.", "resp": "Sin asignar", "status": "progress", "estadoRaw": "En progreso", "pct": 50, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-250", "desc": "Migración Quarkus CDA FRONT", "resp": "Juan Ovelar", "status": "progress", "estadoRaw": "En progreso", "pct": 50, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Mejora Continua", "directChild": true}, {"key": "DIG-239", "desc": "Ajustes Front Quarkus - Alias", "resp": "Luis Meza", "status": "final", "estadoRaw": "Implementado Prod", "pct": 100, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Tarea", "directChild": true}, {"key": "DIG-217", "desc": "Desarrollo Back", "resp": "Antonella Miho Lucero Alarcón", "status": "blocked", "estadoRaw": "EN PAUSA", "pct": 50, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-216", "desc": "Migración Quarkus - Orden de Pago", "resp": "Antonella Miho Lucero Alarcón", "status": "blocked", "estadoRaw": "EN PAUSA", "pct": 50, "deadline": "", "inicio": "15/05/2026", "inicioSort": "2026-05-15", "tipo": "Mejora Continua", "directChild": true}, {"key": "DIG-213", "desc": "Desarrollo Back", "resp": "Jacqueline Gill", "status": "pending", "estadoRaw": "BACKLOG", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-212", "desc": "Migración Quarkus - CDA", "resp": "Jacqueline Gill", "status": "final", "estadoRaw": "Implementado Prod", "pct": 100, "deadline": "", "inicio": "15/05/2026", "inicioSort": "2026-05-15", "tipo": "Mejora Continua", "directChild": true}, {"key": "DIG-211", "desc": "Pruebas Funcionales", "resp": "Luis Meza", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-210", "desc": "Desarrollo Front ", "resp": "Luis Meza", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-209", "desc": "Migración Quarkus - Alias/Cuentas", "resp": "Luis Meza", "status": "final", "estadoRaw": "Implementado Prod", "pct": 100, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Mejora Continua", "directChild": true}, {"key": "DIG-207", "desc": "Implementación", "resp": "Sin asignar", "status": "pending", "estadoRaw": "BACKLOG", "pct": 0, "deadline": "22/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-206", "desc": "Pruebas Funcionales", "resp": "Sin asignar", "status": "pending", "estadoRaw": "BACKLOG", "pct": 0, "deadline": "21/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-205", "desc": "Migración Front", "resp": "Luis Meza", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "17/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-204", "desc": "Migración Back", "resp": "Luis Meza", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "15/06/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-203", "desc": "Migración Quarkus - Tarjeta de Crédito", "resp": "Luis Meza", "status": "final", "estadoRaw": "Implementado Prod", "pct": 100, "deadline": "17/07/2026", "inicio": "05/06/2026", "inicioSort": "2026-06-05", "tipo": "Mejora Continua", "directChild": true}]}, {"key": "DIG-101", "name": "Nuevo Préstamo", "estado": "BACKLOG", "responsable": "Sin asignar", "deadline": "", "total": 0, "listo": 0, "pct": 0, "items": []}, {"key": "DIG-100", "name": "Notificaciones", "estado": "BACKLOG", "responsable": "Sin asignar", "deadline": "", "total": 0, "listo": 0, "pct": 0, "items": []}, {"key": "DIG-99", "name": "Centro de notificaciones APP", "estado": "En progreso", "responsable": "Sin asignar", "deadline": "04/12/2026", "total": 1, "listo": 0, "pct": 0, "items": [{"key": "DIG-225", "desc": "Historia de Usuario", "resp": "Heidy Fabiola Lara Sanguina", "status": "progress", "estadoRaw": "En progreso", "pct": 50, "deadline": "17/07/2026", "inicio": "13/07/2026", "inicioSort": "2026-07-13", "tipo": "Tarea", "directChild": true}]}, {"key": "DIG-98", "name": "QR HUB - Generación", "estado": "BACKLOG", "responsable": "Sin asignar", "deadline": "", "total": 0, "listo": 0, "pct": 0, "items": []}, {"key": "DIG-97", "name": "Biometría de Dispositivo", "estado": "En progreso", "responsable": "Vanessa Diarte", "deadline": "30/11/2026", "total": 5, "listo": 2, "pct": 40, "items": [{"key": "DIG-163", "desc": "Aprobación final de Historia", "resp": "Ximena", "status": "progress", "estadoRaw": "En progreso", "pct": 50, "deadline": "13/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-162", "desc": "Validación con Backoffice y áreas involucradas", "resp": "Ximena", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "13/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-161", "desc": "Analisis Historia de Usuario Macro", "resp": "Ximena", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "13/07/2026", "inicio": "06/07/2026", "inicioSort": "2026-07-06", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-124", "desc": "Prototipado", "resp": "Vanessa Diarte", "status": "progress", "estadoRaw": "En progreso", "pct": 50, "deadline": "17/07/2026", "inicio": "03/07/2026", "inicioSort": "2026-07-03", "tipo": "Tarea", "directChild": true}, {"key": "DIG-123", "desc": "Historia de Usuario", "resp": "Ximena", "status": "progress", "estadoRaw": "En progreso", "pct": 50, "deadline": "13/07/2026", "inicio": "26/06/2026", "inicioSort": "2026-06-26", "tipo": "Tarea", "directChild": true}]}, {"key": "DIG-6", "name": "Proyecto G-Pay", "estado": "En progreso", "responsable": "Camila Montserrat Alderete González", "deadline": "31/08/2026", "total": 29, "listo": 17, "pct": 59, "items": [{"key": "DIG-201", "desc": "Configuración VPN Bancard Ambiente Produc", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Tarea", "directChild": true}, {"key": "DIG-112", "desc": "Servicio Datos de Aprovisionamiento TD", "resp": "Camila Montserrat Alderete González", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "30/06/2026", "inicio": "25/05/2026", "inicioSort": "2026-05-25", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-96", "desc": "Pruebas  Ambiente SAMBOX", "resp": "Koichi Nagasawa", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-95", "desc": "Desarrollo Core", "resp": "Martin Jara", "status": "progress", "estadoRaw": "En progreso", "pct": 50, "deadline": "10/07/2026", "inicio": "10/06/2026", "inicioSort": "2026-06-10", "tipo": "Tarea", "directChild": true}, {"key": "DIG-94", "desc": "Pruebas Funcionales", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "07/08/2026", "inicio": "27/07/2026", "inicioSort": "2026-07-27", "tipo": "Tarea", "directChild": true}, {"key": "DIG-67", "desc": "Validación UX maquetado", "resp": "Koichi Nagasawa", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "08/06/2026", "inicio": "11/06/2026", "inicioSort": "2026-06-11", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-66", "desc": "Configuración Ambiente Desa", "resp": "Camila Montserrat Alderete González", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "19/06/2026", "inicio": "11/06/2026", "inicioSort": "2026-06-11", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-65", "desc": "Revisión Fomularios", "resp": "Camila Montserrat Alderete González", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "12/06/2026", "inicio": "11/06/2026", "inicioSort": "2026-06-11", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-61", "desc": "QA", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "21/08/2026", "inicio": "10/08/2026", "inicioSort": "2026-08-10", "tipo": "Tarea", "directChild": true}, {"key": "DIG-59", "desc": "Desarrollo G-PAY BANCA", "resp": "Camila Montserrat Alderete González", "status": "blocked", "estadoRaw": "EN PAUSA", "pct": 50, "deadline": "24/07/2026", "inicio": "22/05/2026", "inicioSort": "2026-05-22", "tipo": "Tarea", "directChild": true}, {"key": "DIG-57", "desc": "Implementación ", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "31/08/2026", "inicio": "24/08/2026", "inicioSort": "2026-08-24", "tipo": "Tarea", "directChild": true}, {"key": "DIG-53", "desc": "Integracion App servicios backend", "resp": "Koichi Nagasawa", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "24/07/2026", "inicio": "01/07/2026", "inicioSort": "2026-07-01", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-52", "desc": "configuración ambiente Google wallet test y prod", "resp": "Camila Montserrat Alderete González", "status": "progress", "estadoRaw": "En progreso", "pct": 50, "deadline": "19/06/2026", "inicio": "08/06/2026", "inicioSort": "2026-06-08", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-51", "desc": "Configuración ambiente Bancard Test y Prod", "resp": "Camila Montserrat Alderete González", "status": "progress", "estadoRaw": "En progreso", "pct": 50, "deadline": "19/06/2026", "inicio": "08/06/2026", "inicioSort": "2026-06-08", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-50", "desc": "Pruebas servicios CORE integración Bancard TEST", "resp": "Camila Montserrat Alderete González", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "12/06/2026", "inicio": "01/06/2026", "inicioSort": "2026-06-01", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-48", "desc": "Agregar la TC a la Wallet", "resp": "Koichi Nagasawa", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-47", "desc": "Validar y listar la disponibilidad de TC", "resp": "Koichi Nagasawa", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-44", "desc": "Carga de Ticket Especificación Técnica Servicio Core Datos de Aprovisionamiento", "resp": "Camila Montserrat Alderete González", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "05/06/2026", "inicio": "02/06/2026", "inicioSort": "2026-06-02", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-27", "desc": "Especificación Técnica Servicio Core Datos de Aprovisionamiento", "resp": "Camila Montserrat Alderete González", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "03/06/2026", "inicio": "02/06/2026", "inicioSort": "2026-06-02", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-26", "desc": "Servicio MIDD Datos de Aprovisionamiento", "resp": "Camila Montserrat Alderete González", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "10/07/2026", "inicio": "15/06/2026", "inicioSort": "2026-06-15", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-25", "desc": "Servicio Datos de Aprovisionamiento TC y TD", "resp": "Camila Montserrat Alderete González", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "30/06/2026", "inicio": "25/05/2026", "inicioSort": "2026-05-25", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-24", "desc": "Servicios De Integración Bancard", "resp": "Camila Montserrat Alderete González", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "10/07/2026", "inicio": "01/06/2026", "inicioSort": "2026-06-01", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-23", "desc": "Integración SDK HST -> APP", "resp": "Koichi Nagasawa", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "11/06/2026", "inicio": "11/06/2026", "inicioSort": "2026-06-11", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-22", "desc": "Maquetado APP", "resp": "Koichi Nagasawa", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "04/06/2026", "inicio": "28/05/2026", "inicioSort": "2026-05-28", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-17", "desc": "Análisis Prototipo", "resp": "Koichi Nagasawa", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "", "inicio": "27/05/2026", "inicioSort": "2026-05-27", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-15", "desc": "Contexto Prototipo ", "resp": "Camila Montserrat Alderete González", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-12", "desc": "Reunión Bancard", "resp": "Camila Montserrat Alderete González", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-11", "desc": "Recopilado de datos ", "resp": "Camila Montserrat Alderete González", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-10", "desc": "Análisis Técnico G-Pay", "resp": "Camila Montserrat Alderete González", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "29/05/2026", "inicio": "26/05/2026", "inicioSort": "2026-05-26", "tipo": "Tarea", "directChild": true}]}, {"key": "DIG-1", "name": "Proyecto Tarjeta Digital", "estado": "En progreso", "responsable": "Gastón Romero", "deadline": "30/09/2026", "total": 61, "listo": 32, "pct": 52, "items": [{"key": "DIG-189", "desc": "Desbloquear Tarjeta", "resp": "Bruno Lird", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "14/08/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-188", "desc": "Bloquear Tarjeta", "resp": "Bruno Lird", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "07/08/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-160", "desc": "Cliente ingresa al apartado de tarjetas y visualiza sus movimientos realizados con la TD.", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-159", "desc": "Cliente solicita por canales manuales cambiar TC a Física.", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-158", "desc": "Regrabación de tarjeta.", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-157", "desc": "Transacciones y cambios de estado en App y Core", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-156", "desc": "Usuario intenta captura de pantalla en vista de datos sensibles", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-155", "desc": "Cliente ya posee tarjeta virtual activa o está en proceso de solicitud en una cuenta espec", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-154", "desc": "Cliente ya posee tarjeta de débito física (Infonet)", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-153", "desc": "Cliente que realiza el onboarding y se activa su cuenta y caja de ahorro", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-152", "desc": "Cliente que selecciona la cuenta a la que quiere vincular la TD.", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-151", "desc": "Cliente con cuenta dólares que cumple los filtros", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-150", "desc": "Cliente con cuenta guaraníes que cumple los filtros", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-122", "desc": "Obtener movimientos Tarjeta", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "04/09/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-121", "desc": "Cambiar parámetros de Tarjeta", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "28/08/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-120", "desc": "Obtener parámetros de Tarjeta", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "21/08/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-119", "desc": "Desbloquear Tarjeta", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "14/08/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-118", "desc": "Bloquear Tarjeta", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "07/08/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-117", "desc": "Obtener Datos de Tarjeta ", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "31/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-116", "desc": "Obtener Tarjetas", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "24/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-115", "desc": "Crear Tarjeta", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "17/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-114", "desc": "Elegibilidad", "resp": "Sin asignar", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "10/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-111", "desc": "Obtener Movimiento de Tarjeta", "resp": "Bruno Lird", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-109", "desc": "Obtener Movimiento de Tarjeta", "resp": "Juan Emanuel Méndez", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "17/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-107", "desc": "Prueba de servicios de Bancard", "resp": "Gastón Romero", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "19/06/2026", "inicio": "17/06/2026", "inicioSort": "2026-06-17", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-106", "desc": "Correcciones sugeridas por Luis", "resp": "Gastón Romero", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "18/06/2026", "inicio": "17/06/2026", "inicioSort": "2026-06-17", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-105", "desc": "Validación del Análisis con Luis", "resp": "Gastón Romero", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-102", "desc": "Obtener Movimiento de Tarjeta", "resp": "Federico Ñamandu Verón Alvarez", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "31/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-92", "desc": "Maquetado", "resp": "Bruno Lird", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "30/06/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-91", "desc": "Cambiar parámetros de Tarjeta", "resp": "Bruno Lird", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "28/08/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-90", "desc": "Obtener parámetros de Tarjeta", "resp": "Bruno Lird", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "21/08/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-87", "desc": "Obtener Datos de Tarjeta", "resp": "Bruno Lird", "status": "blocked", "estadoRaw": "EN PAUSA", "pct": 50, "deadline": "31/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-86", "desc": "Obtener Tarjetas", "resp": "Bruno Lird", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "24/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-85", "desc": "Crear Tarjeta", "resp": "Bruno Lird", "status": "progress", "estadoRaw": "En progreso", "pct": 50, "deadline": "17/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-84", "desc": "Elegibilidad", "resp": "Bruno Lird", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "10/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-83", "desc": "Cambiar parámetros de Tarjeta", "resp": "Juan Emanuel Méndez", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "21/08/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-82", "desc": "Obtener parámetros de Tarjeta", "resp": "Juan Emanuel Méndez", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "14/08/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-81", "desc": "Desbloquear Tarjeta", "resp": "Juan Emanuel Méndez", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "07/08/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-80", "desc": "Bloquear Tarjeta", "resp": "Juan Emanuel Méndez", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "31/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-79", "desc": "Obtener Datos de Tarjeta", "resp": "Juan Emanuel Méndez", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "24/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-78", "desc": "Obtener Tarjetas", "resp": "Juan Emanuel Méndez", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "17/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-77", "desc": "Crear Tarjeta", "resp": "Edgardo Moisés Silva Ovando", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "10/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-75", "desc": "Cambiar parámetros de Tarjeta", "resp": "Alejandro Martinez", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "31/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-74", "desc": "Obtener parámetros de Tarjeta", "resp": "Alejandro Martinez", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "10/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-73", "desc": "Desbloquear Tarjeta", "resp": "Edgardo Moisés Silva Ovando", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "31/07/2026", "inicio": "11/06/2026", "inicioSort": "2026-06-11", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-72", "desc": "Bloquear Tarjeta", "resp": "Edgardo Moisés Silva Ovando", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "10/07/2026", "inicio": "11/06/2026", "inicioSort": "2026-06-11", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-71", "desc": "Obtener Datos de Tarjeta ", "resp": "Federico Ñamandu Verón Alvarez", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "31/07/2026", "inicio": "", "inicioSort": "9999-99-99", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-70", "desc": "Obtener Tarjetas", "resp": "Federico Ñamandu Verón Alvarez", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "10/07/2026", "inicio": "11/06/2026", "inicioSort": "2026-06-11", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-69", "desc": "Crear Tarjeta", "resp": "Gastón Romero", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "31/07/2026", "inicio": "13/07/2026", "inicioSort": "2026-07-13", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-64", "desc": "Pruebas de Servicios Belinda", "resp": "Gastón Romero", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "17/06/2026", "inicio": "09/06/2026", "inicioSort": "2026-06-09", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-63", "desc": "Pruebas Funcionales", "resp": "Ana", "status": "pending", "estadoRaw": "Por hacer", "pct": 0, "deadline": "25/09/2026", "inicio": "01/07/2026", "inicioSort": "2026-07-01", "tipo": "Tarea", "directChild": true}, {"key": "DIG-62", "desc": "Desarrollo Tarjeta", "resp": "Martin Jara", "status": "progress", "estadoRaw": "En progreso", "pct": 50, "deadline": "28/08/2026", "inicio": "11/06/2026", "inicioSort": "2026-06-11", "tipo": "Tarea", "directChild": true}, {"key": "DIG-28", "desc": "Solución Propuesta TD Digital - Parcial", "resp": "Gastón Romero", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "04/06/2026", "inicio": "02/06/2026", "inicioSort": "2026-06-02", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-21", "desc": "Análisis de la Wiki Bantotal", "resp": "Gastón Romero", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "29/05/2026", "inicio": "28/05/2026", "inicioSort": "2026-05-28", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-20", "desc": "Consultas adicionales de mapeo de servicios", "resp": "Gastón Romero", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "05/06/2026", "inicio": "02/06/2026", "inicioSort": "2026-06-02", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-19", "desc": "Mapeo Historias vs Servicios Core", "resp": "Gastón Romero", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "04/06/2026", "inicio": "02/06/2026", "inicioSort": "2026-06-02", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-18", "desc": "Reunión con compañeros del Core", "resp": "Gastón Romero", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "27/05/2026", "inicio": "27/05/2026", "inicioSort": "2026-05-27", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-16", "desc": "Historia de Usuario Tarjeta Debito Digital", "resp": "Ximena", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "25/05/2026", "inicio": "25/05/2026", "inicioSort": "2026-05-25", "tipo": "Historia", "directChild": true}, {"key": "DIG-9", "desc": "Organizar reunión con el Core/Mango", "resp": "Gastón Romero", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "21/05/2026", "inicio": "20/05/2026", "inicioSort": "2026-05-20", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-8", "desc": "Preguntas para análisis", "resp": "Gastón Romero", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "20/05/2026", "inicio": "18/05/2026", "inicioSort": "2026-05-18", "tipo": "Subtarea", "directChild": false}, {"key": "DIG-7", "desc": "Análisis Técnico", "resp": "Gastón Romero", "status": "final", "estadoRaw": "Finalizado", "pct": 100, "deadline": "17/06/2026", "inicio": "29/05/2026", "inicioSort": "2026-05-29", "tipo": "Tarea", "directChild": true}]}], "mejoraContinua": {"total": 34, "listo": 11, "pct": 32, "items": [{"desc": "Migración Quarkus CDA FRONT", "resp": "Juan Ovelar", "status": "progress", "deadline": ""}, {"desc": "Ajuste en Desembolso Seguros", "resp": "Juan Ovelar", "status": "progress", "deadline": ""}, {"desc": "Ajuste SPI Activo o Inactivo", "resp": "Luis Meza", "status": "pending", "deadline": "21/07/2026"}, {"desc": "Ajuste Pantalla de confirmación Transferencias Externas", "resp": "Luis Meza", "status": "final", "deadline": ""}, {"desc": "Migración Quarkus - Orden de Pago", "resp": "Antonella Miho Lucero Alarcón", "status": "blocked", "deadline": ""}, {"desc": "Migración Quarkus - CDA", "resp": "Jacqueline Gill", "status": "final", "deadline": ""}, {"desc": "Migración Quarkus - Alias/Cuentas", "resp": "Luis Meza", "status": "final", "deadline": ""}, {"desc": "Migración Quarkus - Tarjeta de Crédito", "resp": "Luis Meza", "status": "final", "deadline": "17/07/2026"}, {"desc": "Mejora Prestamos Renovación", "resp": "Pedro Duarte", "status": "progress", "deadline": "21/08/2026"}, {"desc": "Ajustes en QR-HUB provider y comisiones", "resp": "Edgardo Moisés Silva Ovando", "status": "progress", "deadline": ""}, {"desc": "Estado de CDA en Garantia", "resp": "Sin asignar", "status": "pending", "deadline": ""}, {"desc": "Servicio desacoplado de Notificaciones", "resp": "Luis Meza", "status": "pending", "deadline": ""}, {"desc": "Relevamiento y priorización de APIs - Proyecto Automatizaciones QA", "resp": "Juan Emanuel Méndez", "status": "final", "deadline": ""}, {"desc": "Error Registro de Alias = Teléfono", "resp": "Luis Meza", "status": "final", "deadline": ""}, {"desc": "Optimización Notificaciones de transferencias entidades", "resp": "Nathalia Domecq", "status": "pending", "deadline": ""}, {"desc": "Mejoras en el apartado log4j Middleware Appv2", "resp": "Pablo Cesar Acosta", "status": "final", "deadline": "15/07/2026"}, {"desc": "Cuotas de préstamo ", "resp": "Sin asignar", "status": "pending", "deadline": ""}, {"desc": "Desembolso - Seguros", "resp": "Juan Ovelar", "status": "final", "deadline": "15/07/2026"}, {"desc": "Error en verificacion de cedula y bioid en registro", "resp": "Sin asignar", "status": "pending", "deadline": ""}, {"desc": "Documentación de Alertas HTTP - Servicios Transaccionales", "resp": "Nathalia Domecq", "status": "final", "deadline": "03/07/2026"}, {"desc": "Comunicar Rechazos de transferencias en detalle de movimientos", "resp": "Luis Meza", "status": "blocked", "deadline": ""}, {"desc": "Pantallas de Desembolso Mora Error", "resp": "Luis Meza", "status": "final", "deadline": "26/06/2026"}, {"desc": "Automatizacion de alertas de acceso", "resp": "Sin asignar", "status": "pending", "deadline": ""}, {"desc": "Error pago de servicio con TC", "resp": "Héctor Barral", "status": "progress", "deadline": ""}, {"desc": "Mejora en seleccion de metodo de pago", "resp": "Sin asignar", "status": "pending", "deadline": ""}, {"desc": "BLOQUEO TC", "resp": "Luis Meza", "status": "blocked", "deadline": "14/08/2026"}, {"desc": "Config Límite transaccional para QR-HUB", "resp": "Sin asignar", "status": "pending", "deadline": ""}, {"desc": "Actualizacion de fecha de vecimiento (MEJORA)", "resp": "Luis Meza", "status": "pending", "deadline": ""}, {"desc": "Transferencia Duplicada", "resp": "Sin asignar", "status": "pending", "deadline": ""}, {"desc": "APP NO PERMITE PAGAR CON DESCUENTOS APLICADOS", "resp": "Sin asignar", "status": "final", "deadline": ""}, {"desc": "Comprobantes de pago de préstamos", "resp": "Sin asignar", "status": "pending", "deadline": ""}, {"desc": "Mejora en APP", "resp": "Sin asignar", "status": "pending", "deadline": ""}, {"desc": "Solicitud de pago recibida - Rechazo", "resp": "Sin asignar", "status": "pending", "deadline": ""}, {"desc": "Nro de Comprobante diferente", "resp": "Sin asignar", "status": "pending", "deadline": ""}]}, "tareaTipo": {"total": 16, "listo": 3, "pct": 19}, "bigNumbers": {"proyectosEnProgreso": 6, "enPausaOBloqueadas": 7, "vencen7Dias": 11, "vencidas": 8}, "cargaTrabajo": [{"persona": "Luis Meza", "cantidad": 20}, {"persona": "Camila Montserrat Alderete González", "cantidad": 18}, {"persona": "Gastón Romero", "cantidad": 13}, {"persona": "Juan Ovelar", "cantidad": 12}, {"persona": "Bruno Lird", "cantidad": 10}, {"persona": "Koichi Nagasawa", "cantidad": 9}, {"persona": "Pedro Duarte", "cantidad": 8}, {"persona": "Juan Emanuel Méndez", "cantidad": 8}, {"persona": "Edgardo Moisés Silva Ovando", "cantidad": 7}, {"persona": "Ximena", "cantidad": 5}], "performance": {"totalTareasGlobal": 176, "vencidasGlobal": 8, "vencidasAltaPrioridad": 3, "cumplimiento": [{"persona": "Juan Ovelar", "aTiempo": 9, "total": 9, "pct": 100}, {"persona": "Juan Emanuel Méndez", "aTiempo": 7, "total": 7, "pct": 100}, {"persona": "Alejandro Martinez", "aTiempo": 2, "total": 2, "pct": 100}, {"persona": "Edgardo Moisés Silva Ovando", "aTiempo": 4, "total": 5, "pct": 80}, {"persona": "Federico Ñamandu Verón Alvarez", "aTiempo": 3, "total": 4, "pct": 75}, {"persona": "Bruno Lird", "aTiempo": 2, "total": 3, "pct": 67}, {"persona": "Gastón Romero", "aTiempo": 6, "total": 12, "pct": 50}, {"persona": "Luis Meza", "aTiempo": 3, "total": 6, "pct": 50}, {"persona": "Camila Montserrat Alderete González", "aTiempo": 2, "total": 8, "pct": 25}, {"persona": "Koichi Nagasawa", "aTiempo": 1, "total": 4, "pct": 25}, {"persona": "Pedro Duarte", "aTiempo": 0, "total": 3, "pct": 0}, {"persona": "Ximena", "aTiempo": 0, "total": 3, "pct": 0}, {"persona": "Pablo Cesar Acosta", "aTiempo": 0, "total": 2, "pct": 0}, {"persona": "Nathalia Domecq", "aTiempo": 0, "total": 1, "pct": 0}], "vencidasPorPersona": [{"persona": "Camila Montserrat Alderete González", "cantidad": 4}, {"persona": "Ximena", "cantidad": 2}, {"persona": "Martin Jara", "cantidad": 1}], "wip": [{"persona": "Camila Montserrat Alderete González", "cantidad": 4}, {"persona": "Luis Meza", "cantidad": 3}, {"persona": "Juan Ovelar", "cantidad": 2}, {"persona": "Edgardo Moisés Silva Ovando", "cantidad": 2}, {"persona": "Antonella Miho Lucero Alarcón", "cantidad": 2}, {"persona": "Ximena", "cantidad": 2}, {"persona": "Martin Jara", "cantidad": 2}, {"persona": "Bruno Lird", "cantidad": 2}, {"persona": "Koichi Nagasawa", "cantidad": 1}, {"persona": "Heidy Fabiola Lara Sanguina", "cantidad": 1}]}}
+;
+
+const statusMap = {
+  final:{label:'Finalizado',cls:'b-final'}, progress:{label:'En curso',cls:'b-progress'},
+  pending:{label:'Pendiente',cls:'b-pending'}, blocked:{label:'En pausa',cls:'b-blocked'}
+};
+const rankColors = ['#1558a0','#2a78d6','#3a8fe0','#4aa3ea','#5cb3f0','#1046a0','#0d3a80','#0a2f66','#082450'];
+
+let currentFilters = { epica:'all', persona:'all', estado:'all', tipo:'all' };
+
+function populateDropdowns() {
+  const epicaSel = document.getElementById('f-epica');
+  DATA.epics.forEach(e=>{ const o=document.createElement('option'); o.value=e.key; o.textContent=e.name; epicaSel.appendChild(o); });
+
+  const personas = new Set();
+  DATA.epics.forEach(e=>e.items.forEach(it=>personas.add(it.resp)));
+  DATA.mejoraContinua.items.forEach(it=>personas.add(it.resp));
+  const personaSel = document.getElementById('f-persona');
+  [...personas].sort().forEach(p=>{ const o=document.createElement('option'); o.value=p; o.textContent=p; personaSel.appendChild(o); });
+}
+
+function itemMatches(item, epicaKey) {
+  const {epica, persona, estado, tipo} = currentFilters;
+  if (epica!=='all' && epicaKey!==epica) return false;
+  if (persona!=='all' && item.resp!==persona) return false;
+  if (estado!=='all' && item.status!==estado) return false;
+  if (tipo!=='all' && item.tipo!==tipo) return false;
+  return true;
+}
+
+function applyFilters() {
+  currentFilters = {
+    epica: document.getElementById('f-epica').value,
+    persona: document.getElementById('f-persona').value,
+    estado: document.getElementById('f-estado').value,
+    tipo: document.getElementById('f-tipo').value
+  };
+  render();
+}
+function clearFilters() {
+  currentFilters = { epica:'all', persona:'all', estado:'all', tipo:'all' };
+  ['f-epica','f-persona','f-estado','f-tipo'].forEach(id=>document.getElementById(id).value='all');
+  render();
+}
+
+function renderBigNumbers() {
+  document.getElementById('bn-proyectos').textContent = DATA.bigNumbers.proyectosEnProgreso;
+  document.getElementById('bn-pausa').textContent = DATA.bigNumbers.enPausaOBloqueadas;
+  document.getElementById('bn-vencen').textContent = DATA.bigNumbers.vencen7Dias;
+  document.getElementById('bn-vencidas').textContent = DATA.bigNumbers.vencidas;
+}
+
+function renderRankEpicas() {
+  const sorted = [...DATA.epics].sort((a,b)=>b.pct-a.pct);
+  document.getElementById('rank-epicas').innerHTML = sorted.map((e,i)=>`
+    <div class="rank-row">
+      <div class="rank-name" title="${e.name}">${e.name}</div>
+      <div class="rank-track"><div class="rank-fill" style="width:${e.pct}%;background:${rankColors[i%rankColors.length]}"></div></div>
+      <div class="rank-pct">${e.pct}%</div>
+    </div>`).join('');
+}
+
+function renderRankVolumen() {
+  const totalAll = DATA.epics.reduce((s,e)=>s+e.total,0) || 1;
+  const sorted = [...DATA.epics].sort((a,b)=>b.total-a.total);
+  document.getElementById('rank-volumen').innerHTML = sorted.map((e,i)=>{
+    const pct = Math.round(e.total/totalAll*100);
+    return `<div class="rank-row">
+      <div class="rank-name" title="${e.name}">${e.name}</div>
+      <div class="rank-track"><div class="rank-fill" style="width:${pct}%;background:${rankColors[i%rankColors.length]}"></div></div>
+      <div class="rank-pct">${e.total}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderRankCarga() {
+  const max = DATA.cargaTrabajo[0]?.cantidad || 1;
+  document.getElementById('rank-carga').innerHTML = DATA.cargaTrabajo.map((c,i)=>{
+    const pct = Math.round(c.cantidad/max*100);
+    return `<div class="rank-row">
+      <div class="rank-name" title="${c.persona}">${c.persona}</div>
+      <div class="rank-track"><div class="rank-fill" style="width:${pct}%;background:${rankColors[i%rankColors.length]}"></div></div>
+      <div class="rank-pct">${c.cantidad}</div>
+    </div>`;
+  }).join('');
+}
+
+function openPerfModal() {
+  const p = DATA.performance;
+  document.getElementById('perf-total').textContent = p.totalTareasGlobal;
+  document.getElementById('perf-vencidas').textContent = p.vencidasGlobal;
+  document.getElementById('perf-vencidas-sub').textContent = `de las cuales ${p.vencidasAltaPrioridad} son de prioridad Alta/Urgente`;
+
+  const MIN_MUESTRA = 3;
+  const elegibles = p.cumplimiento.filter(c=>c.total>=MIN_MUESTRA);
+  if (elegibles.length) {
+    const top = elegibles[0];
+    document.getElementById('perf-top').textContent = top.pct + '%';
+    document.getElementById('perf-top-sub').textContent = `${top.persona} (${top.aTiempo}/${top.total}, mín. ${MIN_MUESTRA} tareas)`;
+  } else {
+    document.getElementById('perf-top').textContent = '—';
+    document.getElementById('perf-top-sub').textContent = 'sin datos suficientes';
+  }
+
+  document.getElementById('perf-cumplimiento').innerHTML = p.cumplimiento.map((c,i)=>{
+    const color = c.pct>=70 ? '#2d7a27' : c.pct>=40 ? '#c47a00' : '#a02020';
+    return `<div class="rank-row">
+      <div class="rank-name" title="${c.persona}">${c.persona}</div>
+      <div class="rank-track"><div class="rank-fill" style="width:${c.pct}%;background:${color}"></div></div>
+      <div class="rank-pct">${c.pct}%</div>
+    </div><div style="font-size:10.5px;color:#a8a297;margin:-4px 0 8px 160px;">${c.aTiempo}/${c.total} a tiempo</div>`;
+  }).join('');
+
+  const maxVenc = p.vencidasPorPersona[0]?.cantidad || 1;
+  document.getElementById('perf-vencidas-persona').innerHTML = p.vencidasPorPersona.length ? p.vencidasPorPersona.map((v,i)=>{
+    const pct = Math.round(v.cantidad/maxVenc*100);
+    return `<div class="rank-row">
+      <div class="rank-name" title="${v.persona}">${v.persona}</div>
+      <div class="rank-track"><div class="rank-fill" style="width:${pct}%;background:#a02020"></div></div>
+      <div class="rank-pct">${v.cantidad}</div>
+    </div>`;
+  }).join('') : '<div style="font-size:12px;color:#a8a297;">Nadie tiene tareas vencidas — 🎉</div>';
+
+  const maxWip = p.wip[0]?.cantidad || 1;
+  document.getElementById('perf-wip').innerHTML = p.wip.map((w,i)=>{
+    const pct = Math.round(w.cantidad/maxWip*100);
+    return `<div class="rank-row">
+      <div class="rank-name" title="${w.persona}">${w.persona}</div>
+      <div class="rank-track"><div class="rank-fill" style="width:${pct}%;background:#1558a0"></div></div>
+      <div class="rank-pct">${w.cantidad}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('perf-modal-overlay').classList.add('open');
+}
+function closePerfModal() {
+  document.getElementById('perf-modal-overlay').classList.remove('open');
+}
+
+let donutMC=null, donutTarea=null;
+function statusBreakdown(items) {
+  const c = {final:0, progress:0, pending:0, blocked:0};
+  items.forEach(it=>{ if(c[it.status]!==undefined) c[it.status]++; });
+  return c;
+}
+
+function renderMejoraContinua() {
+  const mc = DATA.mejoraContinua;
+  document.getElementById('mc-sub').textContent = `${mc.listo} de ${mc.total} ítems finalizados`;
+  document.getElementById('mc-pct').textContent = mc.pct + '%';
+  const c = statusBreakdown(mc.items);
+  const data = [c.final, c.progress, c.pending, c.blocked];
+  const colors = ['#2d7a27','#1558a0','#c47a00','#a02020'];
+  const labels = ['Finalizado','En curso','Pendiente','En pausa'];
+  if (donutMC) { donutMC.data.datasets[0].data = data; donutMC.update(); }
+  else {
+    donutMC = new Chart(document.getElementById('donutMC').getContext('2d'), {
+      type:'doughnut', data:{ labels, datasets:[{data,backgroundColor:colors,borderWidth:0}]},
+      options:{cutout:'70%', plugins:{legend:{display:false}}, animation:{duration:300}}
+    });
+  }
+  document.getElementById('mc-legend').innerHTML = labels.map((l,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${colors[i]}"></div>${l}: ${data[i]}</div>`).join('');
+}
+
+function renderTareaTipo() {
+  const t = DATA.tareaTipo;
+  document.getElementById('tarea-sub').textContent = `${t.listo} de ${t.total} tareas finalizadas`;
+  document.getElementById('tarea-pct').textContent = t.pct + '%';
+  const allTareaItems = [];
+  DATA.epics.forEach(e=>e.items.forEach(it=>{ if(it.tipo==='Tarea') allTareaItems.push(it); }));
+  const c = statusBreakdown(allTareaItems);
+  const data = [c.final, c.progress, c.pending, c.blocked];
+  const colors = ['#2d7a27','#1558a0','#c47a00','#a02020'];
+  const labels = ['Finalizado','En curso','Pendiente','En pausa'];
+  if (donutTarea) { donutTarea.data.datasets[0].data = data; donutTarea.update(); }
+  else {
+    donutTarea = new Chart(document.getElementById('donutTarea').getContext('2d'), {
+      type:'doughnut', data:{ labels, datasets:[{data,backgroundColor:colors,borderWidth:0}]},
+      options:{cutout:'70%', plugins:{legend:{display:false}}, animation:{duration:300}}
+    });
+  }
+  document.getElementById('tarea-legend').innerHTML = labels.map((l,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${colors[i]}"></div>${l}: ${data[i]}</div>`).join('');
+}
+
+function toggleProject(id) {
+  const b=document.getElementById('body-'+id), c=document.getElementById('chev-'+id);
+  const open=b.classList.contains('open');
+  b.classList.toggle('open',!open); c.classList.toggle('open',!open);
+}
+
+const PROJECT_ORDER = ['DIG-1','DIG-6','DIG-97','DIG-99','DIG-98','DIG-101','DIG-100','DIG-218','DIG-224'];
+function orderedEpics() {
+  return [...DATA.epics].sort((a,b)=>{
+    const ia = PROJECT_ORDER.indexOf(a.key), ib = PROJECT_ORDER.indexOf(b.key);
+    return (ia===-1?999:ia) - (ib===-1?999:ib);
+  });
+}
+
+function render() {
+  const container = document.getElementById('projects-container');
+  container.innerHTML = '';
+  orderedEpics().forEach(epic=>{
+    const visible = epic.items.filter(it=>itemMatches(it, epic.key));
+    if (currentFilters.epica!=='all' && currentFilters.epica!==epic.key) return;
+    if (!visible.length && (currentFilters.persona!=='all'||currentFilters.estado!=='all'||currentFilters.tipo!=='all')) return;
+    const sid = epic.key.replace(/[^a-zA-Z0-9]/g,'');
+    const doneTasks = epic.items.filter(it=>it.directChild && it.status==='final').sort((a,b)=>a.inicioSort.localeCompare(b.inicioSort));
+    const restTasks = epic.items.filter(it=>it.directChild && it.status!=='final').sort((a,b)=>a.inicioSort.localeCompare(b.inicioSort));
+    const macroTasks = [...doneTasks, ...restTasks];
+    const macroHtml = macroTasks.length ? `
+      <div class="macro-section">
+        <div class="macro-title">Tareas macro del proyecto</div>
+        ${macroTasks.map(it=>`
+          <div class="macro-row">
+            <div class="macro-check ${it.status==='final'?'done':''}">${it.status==='final'?'✓':''}</div>
+            <div class="macro-key">${it.key}</div>
+            <div class="macro-name ${it.status==='final'?'done':''}">${it.desc}</div>
+            <span class="badge ${statusMap[it.status].cls}">${statusMap[it.status].label}</span>
+            <div class="macro-pct" style="color:${it.pct===100?'#2d7a27':it.pct===0?'#a8a297':'#1558a0'}">${it.pct}%</div>
+          </div>`).join('')}
+      </div>` : `<div class="macro-section"><div class="macro-title">Tareas macro del proyecto</div><div style="font-size:12px;color:#a8a297;padding:6px 0;">Todavía no hay tareas macro cargadas en Jira para este proyecto.</div></div>`;
+    const card = document.createElement('div'); card.className='project-card';
+    card.innerHTML = `
+      <div class="project-header" onclick="toggleProject('${sid}')">
+        <div class="project-name">📦 ${epic.name}</div>
+        <div class="project-meta">
+          <span class="project-pct" style="color:${epic.pct===100?'#2d7a27':'#1558a0'}">${epic.pct}%</span>
+          <span>${macroTasks.length} tarea${macroTasks.length!==1?'s':''} macro</span>
+          <span class="chevron open" id="chev-${sid}">▼</span>
+        </div>
+      </div>
+      <div class="body-section open" id="body-${sid}">
+        ${macroHtml}
+      </div>`;
+    container.appendChild(card);
+  });
+  document.getElementById('last-updated').textContent = 'Última actualización: ' + new Date().toLocaleString('es-PY');
+}
+
+document.getElementById('dashdate').textContent = new Date().toLocaleDateString('es-PY',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+populateDropdowns();
+renderBigNumbers();
+renderRankEpicas();
+renderRankVolumen();
+renderRankCarga();
+renderMejoraContinua();
+renderTareaTipo();
+render();
+
+// ══════════════════════════════════════════════
+// SINCRONIZACIÓN EN VIVO CON JIRA
+// ══════════════════════════════════════════════
+
+function findFieldId(fieldNames, nameSubstr) {
+  const target = nameSubstr.toLowerCase();
+  const found = Object.keys(fieldNames || {}).find(id => (fieldNames[id]||'').toLowerCase().includes(target));
+  return found || null;
+}
+
+function badgeEstadoJS(statusName, statusCategory) {
+  const e = (statusName||'').trim();
+  if (['Finalizado','Implementado Prod','BETA'].includes(e)) return 'final';
+  if (e === 'En progreso') return 'progress';
+  if (['Por hacer','BACKLOG'].includes(e)) return 'pending';
+  if (e === 'EN PAUSA') return 'blocked';
+  const cat = (statusCategory||'').toLowerCase();
+  if (cat === 'done') return 'final';
+  if (cat === 'in progress' || cat === 'indeterminate') return 'progress';
+  return 'pending';
+}
+const STATUS_PCT_JS = {final:100, progress:50, pending:0, blocked:50};
+
+function fmtDateISO(s) {
+  if (!s) return '';
+  const d = new Date(s);
+  if (isNaN(d)) return '';
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+function sortKeyISO(s) {
+  if (!s) return '9999-99-99';
+  const d = new Date(s);
+  if (isNaN(d)) return '9999-99-99';
+  return d.toISOString().slice(0,10);
+}
+
+const EPIC_NAMES_APP = {
+  'DIG-224':'Apple Pay','DIG-218':'Migración Quarkus','DIG-101':'Nuevo Préstamo',
+  'DIG-100':'Notificaciones','DIG-99':'Centro de notificaciones APP','DIG-98':'QR HUB - Generación',
+  'DIG-97':'Biometría de Dispositivo','DIG-6':'Proyecto G-Pay','DIG-1':'Proyecto Tarjeta Digital'
+};
+const MEJORA_EPIC_KEY = 'DIG-108';
+
+function transformAppTuData(issues, fieldNames) {
+  const dueFieldId = 'duedate';
+  const resolvedFieldId = 'resolutiondate';
+  const updatedFieldId = 'updated';
+  const startFieldId = findFieldId(fieldNames, 'fecha de inicio') || findFieldId(fieldNames, 'start date');
+
+  // Filtrar solo issues del proyecto DIG (APP TU)
+  const digIssues = issues.filter(i => i.key.startsWith('DIG-'));
+  const byKey = {};
+  digIssues.forEach(i => byKey[i.key] = i);
+
+  function resolveEpic(issue, depth) {
+    depth = depth || 0;
+    if (depth > 10) return null;
+    if (issue.fields.issuetype && issue.fields.issuetype.name === 'Epic') return issue.key;
+    const parentKey = issue.fields.parent && issue.fields.parent.key;
+    if (!parentKey || !byKey[parentKey]) return null;
+    return resolveEpic(byKey[parentKey], depth+1);
+  }
+
+  const leafTypes = ['Tarea','Subtarea','Mejora Continua','Historia'];
+  const epics = [];
+  Object.keys(EPIC_NAMES_APP).forEach(ekey => {
+    const epicIssue = byKey[ekey];
+    if (!epicIssue) return; // la épica no vino en esta sincronización
+    const leafItems = digIssues.filter(i => leafTypes.includes(i.fields.issuetype.name) && resolveEpic(i) === ekey);
+    const total = leafItems.length;
+    let listo = 0;
+    const items = leafItems.map(it => {
+      const st = badgeEstadoJS(it.fields.status.name, it.fields.status.statusCategory && it.fields.status.statusCategory.name);
+      if (it.fields.status.statusCategory && it.fields.status.statusCategory.key === 'done') listo++;
+      const inicioRaw = startFieldId ? it.fields[startFieldId] : null;
+      return {
+        key: it.key,
+        desc: (it.fields.summary||'').slice(0,90),
+        resp: (it.fields.assignee && it.fields.assignee.displayName) || 'Sin asignar',
+        status: st,
+        estadoRaw: it.fields.status.name,
+        pct: STATUS_PCT_JS[st],
+        deadline: fmtDateISO(it.fields[dueFieldId]),
+        inicio: fmtDateISO(inicioRaw),
+        inicioSort: sortKeyISO(inicioRaw),
+        tipo: it.fields.issuetype.name,
+        directChild: (it.fields.parent && it.fields.parent.key) === ekey
+      };
+    });
+    const pct = total ? Math.round(listo/total*100) : 0;
+    epics.push({
+      key: ekey, name: EPIC_NAMES_APP[ekey],
+      estado: epicIssue.fields.status.name,
+      responsable: (epicIssue.fields.assignee && epicIssue.fields.assignee.displayName) || 'Sin asignar',
+      deadline: fmtDateISO(epicIssue.fields[dueFieldId]),
+      total, listo, pct, items
+    });
+  });
+
+  // Mejora Continua (por tipo, en todo el proyecto DIG)
+  const mcItems = digIssues.filter(i => i.fields.issuetype.name === 'Mejora Continua');
+  const mcListo = mcItems.filter(i => i.fields.status.statusCategory && i.fields.status.statusCategory.key === 'done').length;
+  const mcOut = mcItems.map(it => ({
+    desc: (it.fields.summary||'').slice(0,90),
+    resp: (it.fields.assignee && it.fields.assignee.displayName) || 'Sin asignar',
+    status: badgeEstadoJS(it.fields.status.name, it.fields.status.statusCategory && it.fields.status.statusCategory.name),
+    deadline: fmtDateISO(it.fields[dueFieldId])
+  }));
+
+  // Tarea tipo
+  const tareaItems = digIssues.filter(i => i.fields.issuetype.name === 'Tarea');
+  const tareaListo = tareaItems.filter(i => i.fields.status.statusCategory && i.fields.status.statusCategory.key === 'done').length;
+
+  // Big numbers
+  const today = new Date();
+  const in7 = new Date(); in7.setDate(today.getDate()+7);
+  const proyectosEnProgreso = Object.keys(EPIC_NAMES_APP).filter(k => byKey[k] && byKey[k].fields.status.name === 'En progreso').length;
+  const enPausa = digIssues.filter(i => i.fields.status.name === 'EN PAUSA').length;
+  let vencen7 = 0, vencidas = 0;
+  digIssues.forEach(i => {
+    if (i.fields.issuetype.name === 'Epic') return;
+    const due = i.fields[dueFieldId] ? new Date(i.fields[dueFieldId]) : null;
+    const isDone = i.fields.status.statusCategory && i.fields.status.statusCategory.key === 'done';
+    if (due && !isDone) {
+      if (due < today) vencidas++;
+      else if (due <= in7) vencen7++;
+    }
+  });
+
+  // Carga de trabajo por persona
+  const cargaMap = {};
+  digIssues.forEach(i => {
+    if (leafTypes.includes(i.fields.issuetype.name)) {
+      const resp = i.fields.assignee && i.fields.assignee.displayName;
+      if (resp) cargaMap[resp] = (cargaMap[resp]||0) + 1;
+    }
+  });
+  const cargaTrabajo = Object.entries(cargaMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([persona,cantidad])=>({persona,cantidad}));
+
+  // Performance: cumplimiento, vencidas por persona, WIP
+  const onTime = {}, comparable = {};
+  digIssues.forEach(i => {
+    if (i.fields.status.statusCategory && i.fields.status.statusCategory.key === 'done') {
+      const resuelta = i.fields[resolvedFieldId] ? new Date(i.fields[resolvedFieldId]) : null;
+      const due = i.fields[dueFieldId] ? new Date(i.fields[dueFieldId]) : null;
+      const resp = i.fields.assignee && i.fields.assignee.displayName;
+      if (resuelta && due && resp) {
+        comparable[resp] = (comparable[resp]||0) + 1;
+        if (resuelta <= due) onTime[resp] = (onTime[resp]||0) + 1;
+      }
+    }
+  });
+  const cumplimiento = Object.keys(comparable).map(p => ({
+    persona:p, aTiempo: onTime[p]||0, total: comparable[p], pct: Math.round((onTime[p]||0)/comparable[p]*100)
+  })).sort((a,b)=> b.pct-a.pct || b.total-a.total);
+
+  const vencPersonaMap = {};
+  digIssues.forEach(i => {
+    if (i.fields.issuetype.name==='Epic') return;
+    const due = i.fields[dueFieldId] ? new Date(i.fields[dueFieldId]) : null;
+    const isDone = i.fields.status.statusCategory && i.fields.status.statusCategory.key === 'done';
+    const resp = i.fields.assignee && i.fields.assignee.displayName;
+    if (due && !isDone && due < today && resp) vencPersonaMap[resp] = (vencPersonaMap[resp]||0)+1;
+  });
+  const vencidasPorPersona = Object.entries(vencPersonaMap).sort((a,b)=>b[1]-a[1]).map(([persona,cantidad])=>({persona,cantidad}));
+
+  const wipMap = {};
+  digIssues.forEach(i => {
+    const cat = i.fields.status.statusCategory && i.fields.status.statusCategory.key;
+    const resp = i.fields.assignee && i.fields.assignee.displayName;
+    if (cat === 'indeterminate' && resp) wipMap[resp] = (wipMap[resp]||0)+1;
+  });
+  const wip = Object.entries(wipMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([persona,cantidad])=>({persona,cantidad}));
+
+  return {
+    epics,
+    mejoraContinua: { total: mcItems.length, listo: mcListo, pct: mcItems.length ? Math.round(mcListo/mcItems.length*100):0, items: mcOut },
+    tareaTipo: { total: tareaItems.length, listo: tareaListo, pct: tareaItems.length ? Math.round(tareaListo/tareaItems.length*100):0 },
+    bigNumbers: { proyectosEnProgreso, enPausaOBloqueadas: enPausa, vencen7Dias: vencen7, vencidas },
+    cargaTrabajo,
+    performance: { totalTareasGlobal: digIssues.filter(i=>i.fields.issuetype.name!=='Epic').length, vencidasGlobal: vencidas, vencidasAltaPrioridad: digIssues.filter(i=>{
+        const due = i.fields[dueFieldId] ? new Date(i.fields[dueFieldId]) : null;
+        const isDone = i.fields.status.statusCategory && i.fields.status.statusCategory.key === 'done';
+        return due && !isDone && due<today && ['Highest','High'].includes(i.fields.priority && i.fields.priority.name);
+      }).length,
+      cumplimiento, vencidasPorPersona, wip
+    }
+  };
+}
+
+function setSyncStatus(msg, cls) {
+  const el = document.getElementById('sync-status');
+  el.textContent = msg;
+  el.className = 'sync-status' + (cls ? ' '+cls : '');
+}
+
+async function syncFromJira() {
+  const btn = document.getElementById('btn-sync');
+  btn.disabled = true;
+  setSyncStatus('🔄 Sincronizando con Jira...', '');
+  try {
+    const resp = await fetch('/.netlify/functions/jira-sync');
+    const json = await resp.json();
+    if (!resp.ok || json.error) {
+      setSyncStatus('⚠️ ' + (json.error || 'Error al sincronizar') + (json.detail ? ' — ' + JSON.stringify(json.detail).slice(0,200) : ''), 'error');
+      btn.disabled = false;
+      return;
+    }
+    DATA = transformAppTuData(json.issues, json.fieldNames);
+    document.getElementById('f-epica').innerHTML = '<option value="all">Todos</option>';
+    document.getElementById('f-persona').innerHTML = '<option value="all">Todas</option>';
+    populateDropdowns();
+    renderBigNumbers(); renderRankEpicas(); renderRankVolumen(); renderRankCarga();
+    renderMejoraContinua(); renderTareaTipo(); render();
+    setSyncStatus('✅ Sincronizado con Jira — ' + new Date().toLocaleTimeString('es-PY') + ` (${json.total} tickets de DIG+UXUI recibidos)`, 'ok');
+  } catch (e) {
+    setSyncStatus('⚠️ Error de conexión: ' + e.message, 'error');
+  }
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>

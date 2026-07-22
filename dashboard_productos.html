@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ══════════════════════════════════════════════
+// ⚠️  REEMPLAZÁ ESTOS DOS VALORES
+const SUPABASE_URL = 'https://qszzabybiieolnajaszk.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzenphYnliaWllb2xuYWphc3prIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNjUyMTQsImV4cCI6MjA5NjY0MTIxNH0.8If32to25vLkIvEP0NpaI1T9RDRLp_wP7DrI1Q5yJPA';
+// ══════════════════════════════════════════════
+(async () => {
+  const { createClient } = supabase;
+  const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; }
+  else { window._userEmail = session.user.email; }
+})();
+</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Productos Digitales — Dashboard PM</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin:0; padding:0; }
+  body { font-family:'Segoe UI', system-ui, sans-serif; background:#f4f3ef; color:#1a1a18; min-height:100vh; }
+  .container { max-width: 1180px; margin:0 auto; padding: 1.75rem 1.5rem 3rem; }
+
+  #_auth-bar { display:flex; align-items:center; justify-content:space-between; padding:10px 24px; background:#fff; border-bottom:1px solid #e5e4de; font-size:13px; color:#7a7a72; position:sticky; top:0; z-index:100; }
+  .btn-logout { padding:5px 14px; border-radius:7px; border:1px solid #d0cfc8; background:#fff; font-size:12px; font-weight:600; cursor:pointer; color:#941818; font-family:inherit; }
+
+  .header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; flex-wrap:wrap; gap:12px; }
+  .header-left h1 { font-size:22px; font-weight:700; color:#1a1a18; letter-spacing:-0.01em; }
+  .header-left .subtitle { font-size:13px; color:#8a8578; margin-top:2px; }
+  .nav-btns { display:flex; gap:8px; flex-wrap:wrap; }
+  .nav-btn { padding:8px 14px; border-radius:8px; border:1px solid #e2e0d8; background:#fff; font-size:12.5px; font-weight:600; cursor:pointer; color:#5c584f; text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:border-color .15s,color .15s; }
+  .nav-btn:hover { border-color:#c8c6bc; color:#1a1a18; }
+  .btn-sync { background:#8a3ffc; border-color:#8a3ffc; color:#fff; font-weight:700; cursor:pointer; }
+  .btn-sync:hover { background:#7a2ff0; border-color:#7a2ff0; color:#fff; }
+  .btn-sync:disabled { opacity:0.6; cursor:wait; }
+  .sync-status { font-size:12px; color:#8a8578; margin:0 0 1.25rem; min-height:16px; }
+  .sync-status.error { color:#a02020; }
+  .sync-status.ok { color:#2d7a27; }
+
+  .info-note { font-size:12px; color:#7a5c00; background:#fff8e0; border-radius:10px; padding:10px 14px; margin-bottom:1.25rem; line-height:1.5; }
+
+  .bignums { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:1.5rem; }
+  .bn-card { background:#fff; border:1px solid #ece9e0; border-radius:12px; padding:16px 18px; position:relative; overflow:hidden; }
+  .bn-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--accent); opacity:.8; }
+  .bn-label { font-size:11.5px; color:#948e80; font-weight:600; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
+  .bn-num { font-size:28px; font-weight:800; color:var(--accent); letter-spacing:-0.02em; }
+  .bn-sub { font-size:11.5px; color:#a8a297; margin-top:2px; }
+
+  .charts-grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:1.5rem; }
+  .chart-card { background:#fff; border:1px solid #ece9e0; border-radius:12px; padding:18px 20px; }
+  .chart-title { font-size:13px; font-weight:700; color:#3a3a38; margin-bottom:3px; }
+  .chart-sub { font-size:11.5px; color:#a8a297; margin-bottom:14px; }
+  .chart-box { position:relative; height:230px; }
+
+  .rank-row { display:flex; align-items:center; gap:10px; margin-bottom:9px; }
+  .rank-name { font-size:12.5px; color:#3a3a38; width:170px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
+  .rank-track { flex:1; background:#f0efe9; border-radius:6px; height:9px; overflow:hidden; }
+  .rank-fill { height:100%; border-radius:6px; }
+  .rank-pct { font-size:12px; font-weight:700; color:#3a3a38; width:44px; text-align:right; }
+  .rank-detail { font-size:10.5px; color:#a8a297; margin:-4px 0 8px 180px; }
+
+  .task-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid #f5f4ee; font-size:12.5px; flex-wrap:wrap; }
+  .task-row:first-child { border-top:none; }
+  .task-key { font-weight:700; color:#3a3a38; width:70px; flex-shrink:0; font-size:11.5px; }
+  .task-desc { flex:1; min-width:180px; }
+  .task-meta { color:#a8a297; font-size:11.5px; }
+
+  .badge { display:inline-block; padding:3px 9px; border-radius:999px; font-size:10.5px; font-weight:700; white-space:nowrap; }
+  .b-final{background:#d4f0e6;color:#0a5e42;} .b-progress{background:#ddeaf8;color:#1053a0;}
+  .b-pending{background:#fdefd4;color:#7a4800;} .b-blocked{background:#fde4e4;color:#941818;}
+
+  .filter-bar { background:#fff; border:1px solid #ece9e0; border-radius:12px; padding:14px 18px; margin-bottom:1.25rem; display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+  .filter-group { display:flex; flex-direction:column; gap:4px; }
+  .filter-label { font-size:10.5px; font-weight:700; color:#948e80; text-transform:uppercase; letter-spacing:.04em; }
+  .filter-select { background:#faf9f5; border:1px solid #e2e0d8; border-radius:6px; padding:6px 10px; font-size:12.5px; font-family:inherit; color:#1a1a18; cursor:pointer; min-width:140px; }
+
+  .last-updated { font-size:11.5px; color:#b0afa8; margin-top:1.5rem; text-align:right; }
+
+  @media (max-width:900px) { .charts-grid { grid-template-columns:1fr; } }
+
+  .scope-btns { display:flex; gap:8px; margin-bottom:1.25rem; flex-wrap:wrap; }
+  .scope-btn { padding:8px 16px; border-radius:20px; border:1px solid #e2e0d8; background:#fff; font-size:12.5px; font-weight:700; cursor:pointer; color:#5c584f; font-family:inherit; transition:all .15s; }
+  .scope-btn:hover { border-color:#c8c6bc; }
+  .scope-btn.active { background:#8a3ffc; border-color:#8a3ffc; color:#fff; }
+  .section-scope-label { font-size:11px; font-weight:700; color:#8a3ffc; text-transform:uppercase; letter-spacing:.04em; margin-bottom:10px; }
+</style>
+</head>
+<body>
+
+<div id="_auth-bar">
+  <span>📋 Dashboard PM &nbsp;·&nbsp; <strong id="_user-email" style="color:#1a1a18"></strong></span>
+  <button class="btn-logout" onclick="(async()=>{const {createClient}=supabase;const sb=createClient('https://qszzabybiieolnajaszk.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzenphYnliaWllb2xuYWphc3prIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNjUyMTQsImV4cCI6MjA5NjY0MTIxNH0.8If32to25vLkIvEP0NpaI1T9RDRLp_wP7DrI1Q5yJPA');await sb.auth.signOut();window.location.href='index.html';})()">Cerrar sesión</button>
+</div>
+<script>document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('_user-email');if(el&&window._userEmail)el.textContent=window._userEmail;});</script>
+
+<div class="container">
+  <div class="header">
+    <div class="header-left">
+      <h1>🧩 Productos Digitales</h1>
+      <div class="subtitle" id="dashdate"></div>
+    </div>
+    <div class="nav-btns">
+      <button class="nav-btn btn-sync" id="btn-sync" onclick="syncFromJira()">🔄 Sincronizar con Jira</button>
+      <a class="nav-btn" href="dashboard_app_1.html">📱 APP TU</a>
+      <a class="nav-btn" href="dashboard_web_2.html">🌐 WEB TU</a>
+      <a class="nav-btn" href="dashboard_incidencias.html">🚨 Incidencias TU</a>
+      <a class="nav-btn" href="index.html">← Inicio</a>
+    </div>
+  </div>
+  <div class="sync-status" id="sync-status"></div>
+
+  <div class="info-note">
+    ℹ️ Vista consolidada de <b>Abril, Mayo, Junio y Julio</b>. Se excluyen 30 tareas de Marzo (período previo) y 2 sin sprint asignado (backlog puro).
+  </div>
+
+  <div class="bignums">
+    <div class="bn-card" style="--accent:#8a3ffc"><div class="bn-label">Tareas finalizadas</div><div class="bn-num" id="bn-finalizadas">0</div><div class="bn-sub" id="bn-finalizadas-sub"></div></div>
+    <div class="bn-card" style="--accent:#8a3ffc"><div class="bn-label">Efectividad</div><div class="bn-num" id="bn-efectividad">0%</div><div class="bn-sub" id="bn-efectividad-sub"></div></div>
+    <div class="bn-card" style="--accent:#c47a00"><div class="bn-label">No finalizadas</div><div class="bn-num" id="bn-nofinal">0</div><div class="bn-sub">en curso, pendientes o en pausa</div></div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:1.5rem;">
+    <div class="chart-title">🕓 Tareas no finalizadas</div>
+    <div class="chart-sub" id="nofinal-sub"></div>
+    <div id="nofinal-list"></div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Tareas por asignado</div>
+      <div class="chart-sub" id="asignado-sub"></div>
+      <div id="rank-asignado"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Tareas por iniciativa</div>
+      <div class="chart-sub">Agrupado por tarea madre (Parent), top 12</div>
+      <div id="rank-epica"></div>
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:1.5rem;">
+    <div class="chart-title">📅 Ranking de cumplimiento de fechas</div>
+    <div class="chart-sub">% de tareas finalizadas antes o en la fecha de vencimiento</div>
+    <div id="rank-cumplimiento"></div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Carga por persona (story points)</div>
+      <div class="chart-sub">Distribución del esfuerzo total, no solo cantidad de tickets</div>
+      <div class="chart-box"><canvas id="spChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Story points por persona</div>
+      <div class="chart-sub" id="sp-sub"></div>
+      <div id="rank-sp"></div>
+    </div>
+  </div>
+
+  <div class="last-updated" id="last-updated"></div>
+</div>
+
+
+<script>
+let DATA = {"consolidado": {"finalizadas": 203, "total": 227, "efectividad": 89.4, "porAsignado": [{"persona": "Vanessa Diarte", "cantidad": 82}, {"persona": "Luis Leiva", "cantidad": 78}, {"persona": "Roque Peralta", "cantidad": 67}], "porEpica": [{"epica": "V2", "cantidad": 31}, {"epica": "Organización", "cantidad": 28}, {"epica": "Diseño Grafico", "cantidad": 18}, {"epica": "Sitio Web Institucional", "cantidad": 16}, {"epica": "Adopción Pantallas Producción", "cantidad": 14}, {"epica": "Tarjeta Digital", "cantidad": 13}, {"epica": "Análisis MKT Empresas", "cantidad": 13}, {"epica": "Mejoras SWI", "cantidad": 9}, {"epica": "Mockups Empresas P2", "cantidad": 9}, {"epica": "Generación de QR BCP", "cantidad": 8}, {"epica": "Banca Empresa", "cantidad": 8}, {"epica": "Cuentas & Ahorro", "cantidad": 7}], "cumplimiento": [{"persona": "Roque Peralta", "aTiempo": 12, "tardia": 38, "total": 50, "pct": 24}, {"persona": "Luis Leiva", "aTiempo": 12, "tardia": 51, "total": 63, "pct": 19}, {"persona": "Vanessa Diarte", "aTiempo": 11, "tardia": 49, "total": 60, "pct": 18}], "cargaSP": [{"persona": "Luis Leiva", "sp": 397.0}, {"persona": "Vanessa Diarte", "sp": 354.0}, {"persona": "Roque Peralta", "sp": 282.0}], "noFinalizadas": [{"key": "UXUI-148", "desc": "Generar QR HUB revisión de Prototipo", "resp": "Roque Peralta", "status": "blocked", "deadline": "03/06/2026"}, {"key": "UXUI-321", "desc": "Pantallas QR Nivel Internacional", "resp": "Roque Peralta", "status": "pending", "deadline": "17/07/2026"}, {"key": "UXUI-313", "desc": "Login", "resp": "Vanessa Diarte", "status": "progress", "deadline": "17/07/2026"}, {"key": "UXUI-306", "desc": "Autorizaciones", "resp": "Roque Peralta", "status": "progress", "deadline": "17/07/2026"}, {"key": "UXUI-300", "desc": "Incluir pantalla de carga en los flujos", "resp": "Luis Leiva", "status": "progress", "deadline": "17/07/2026"}, {"key": "UXUI-312", "desc": "Cajas de Ahorro", "resp": "Luis Leiva", "status": "progress", "deadline": "20/07/2026"}, {"key": "UXUI-309", "desc": "Reportes", "resp": "Roque Peralta", "status": "pending", "deadline": "20/07/2026"}, {"key": "UXUI-308", "desc": "Órdenes de Pago", "resp": "Roque Peralta", "status": "pending", "deadline": "20/07/2026"}, {"key": "UXUI-297", "desc": "Analisis de recorrido del usuario", "resp": "Vanessa Diarte", "status": "progress", "deadline": "20/07/2026"}, {"key": "UXUI-266", "desc": "Prototipo Pre Aprobado - Dinámico", "resp": "Luis Leiva", "status": "progress", "deadline": "20/07/2026"}, {"key": "UXUI-311", "desc": "Préstamos", "resp": "Roque Peralta", "status": "pending", "deadline": "21/07/2026"}, {"key": "UXUI-310", "desc": "Pago de Servicios ", "resp": "Roque Peralta", "status": "pending", "deadline": "21/07/2026"}, {"key": "UXUI-298", "desc": "Prototipo en Baja", "resp": "Vanessa Diarte", "status": "pending", "deadline": "21/07/2026"}, {"key": "UXUI-293", "desc": "Socialización Prototipo", "resp": "Vanessa Diarte", "status": "pending", "deadline": "21/07/2026"}, {"key": "UXUI-290", "desc": "Alta Prototipo Generación QR", "resp": "Roque Peralta", "status": "pending", "deadline": "21/07/2026"}, {"key": "UXUI-277", "desc": "Demostración Prototipo Notificaciones", "resp": "Vanessa Diarte", "status": "pending", "deadline": "21/07/2026"}, {"key": "UXUI-319", "desc": "Ajuste Pantalla Desembolso", "resp": "Luis Leiva", "status": "progress", "deadline": "22/07/2026"}, {"key": "UXUI-276", "desc": "Prototipo Notificaciones", "resp": "Vanessa Diarte", "status": "pending", "deadline": "22/07/2026"}, {"key": "UXUI-325", "desc": "Intranet Ajustes Interno", "resp": "Vanessa Diarte", "status": "pending", "deadline": ""}, {"key": "UXUI-317", "desc": "Validación de estados de TC", "resp": "Vanessa Diarte", "status": "pending", "deadline": ""}, {"key": "UXUI-307", "desc": "Agenda", "resp": "Luis Leiva", "status": "progress", "deadline": ""}, {"key": "UXUI-286", "desc": "Mockups Empresas P2", "resp": "Roque Peralta", "status": "progress", "deadline": ""}, {"key": "UXUI-127", "desc": "Crear apartado de videos tutoriales en Sitio Web", "resp": "Vanessa Diarte", "status": "pending", "deadline": ""}, {"key": "UXUI-111", "desc": "Rediseño de FAQ", "resp": "Vanessa Diarte", "status": "pending", "deadline": ""}]}, "marzoExcluido": 30, "backlogExcluido": 2}
+;
+const rankColors = ['#8a3ffc','#a668fd','#6a2fd0','#c39cfe','#5a1fb0','#d9c2fe','#4a0f9a','#eaddff'];
+const statusLabels = {final:'Finalizado',progress:'En curso',pending:'Pendiente',blocked:'En pausa'};
+let spChartInstance = null;
+
+function renderAll() {
+  const d = DATA.consolidado;
+
+  document.getElementById('bn-finalizadas').textContent = d.finalizadas;
+  document.getElementById('bn-finalizadas-sub').textContent = `de ${d.total} tareas (Abr-Jul)`;
+  document.getElementById('bn-efectividad').textContent = d.efectividad + '%';
+  document.getElementById('bn-efectividad-sub').textContent = 'finalizadas / total';
+  document.getElementById('bn-nofinal').textContent = d.noFinalizadas.length;
+
+  document.getElementById('nofinal-sub').textContent = `${d.noFinalizadas.length} tareas — ordenadas por fecha de vencimiento`;
+  document.getElementById('nofinal-list').innerHTML = d.noFinalizadas.length ? d.noFinalizadas.map(t=>`
+    <div class="task-row">
+      <span class="task-key">${t.key}</span>
+      <span class="badge b-${t.status}">${statusLabels[t.status]}</span>
+      <span class="task-desc"><strong>${t.desc}</strong></span>
+      <span class="task-meta">${t.resp} ${t.deadline ? '· vence '+t.deadline : '· sin fecha'}</span>
+    </div>`).join('') : '<div style="font-size:12px;color:#a8a297;">Todo finalizado 🎉</div>';
+
+  document.getElementById('asignado-sub').textContent = 'Abril → Julio 2026';
+  const maxAsig = d.porAsignado[0]?.cantidad || 1;
+  document.getElementById('rank-asignado').innerHTML = d.porAsignado.map((p,i)=>`
+    <div class="rank-row">
+      <div class="rank-name" title="${p.persona}">${p.persona}</div>
+      <div class="rank-track"><div class="rank-fill" style="width:${Math.round(p.cantidad/maxAsig*100)}%;background:${rankColors[i%rankColors.length]}"></div></div>
+      <div class="rank-pct">${p.cantidad}</div>
+    </div>`).join('');
+
+  const maxEpica = d.porEpica[0]?.cantidad || 1;
+  document.getElementById('rank-epica').innerHTML = d.porEpica.map((e,i)=>`
+    <div class="rank-row">
+      <div class="rank-name" title="${e.epica}">${e.epica}</div>
+      <div class="rank-track"><div class="rank-fill" style="width:${Math.round(e.cantidad/maxEpica*100)}%;background:${rankColors[i%rankColors.length]}"></div></div>
+      <div class="rank-pct">${e.cantidad}</div>
+    </div>`).join('');
+
+  document.getElementById('rank-cumplimiento').innerHTML = d.cumplimiento.length ? d.cumplimiento.map(c=>{
+    const color = c.pct>=70?'#2d7a27':c.pct>=40?'#c47a00':'#a02020';
+    return `<div class="rank-row">
+      <div class="rank-name" title="${c.persona}">${c.persona}</div>
+      <div class="rank-track"><div class="rank-fill" style="width:${c.pct}%;background:${color}"></div></div>
+      <div class="rank-pct">${c.pct}%</div>
+    </div><div class="rank-detail">${c.aTiempo} a tiempo · ${c.tardia} tardías · ${c.total} comparables</div>`;
+  }).join('') : '<div style="font-size:12px;color:#a8a297;">Sin datos comparables</div>';
+
+  if (spChartInstance) { spChartInstance.destroy(); }
+  spChartInstance = new Chart(document.getElementById('spChart'), {
+    type:'doughnut',
+    data:{ labels: d.cargaSP.map(s=>s.persona), datasets:[{data: d.cargaSP.map(s=>s.sp), backgroundColor: rankColors, borderWidth:3, borderColor:'#fff'}] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{legend:{position:'bottom',labels:{boxWidth:9,font:{size:10.5}}}} }
+  });
+
+  document.getElementById('sp-sub').textContent = 'Total acumulado Abril → Julio';
+  const maxSp = d.cargaSP[0]?.sp || 1;
+  document.getElementById('rank-sp').innerHTML = d.cargaSP.map((s,i)=>`
+    <div class="rank-row">
+      <div class="rank-name" title="${s.persona}">${s.persona}</div>
+      <div class="rank-track"><div class="rank-fill" style="width:${Math.round(s.sp/maxSp*100)}%;background:${rankColors[i%rankColors.length]}"></div></div>
+      <div class="rank-pct">${s.sp}</div>
+    </div>`).join('');
+
+  document.getElementById('last-updated').textContent = 'Última actualización: ' + new Date().toLocaleString('es-PY');
+}
+
+renderAll();
+document.getElementById('dashdate').textContent = new Date().toLocaleDateString('es-PY',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+// ══════════════════════════════════════════════
+// SINCRONIZACIÓN EN VIVO CON JIRA
+// ══════════════════════════════════════════════
+
+function findFieldIdProd(fieldNames, nameSubstr) {
+  const target = nameSubstr.toLowerCase();
+  const found = Object.keys(fieldNames || {}).find(id => (fieldNames[id]||'').toLowerCase().includes(target));
+  return found || null;
+}
+
+function badgeEstadoProd(statusName, statusCategoryKey) {
+  const e = (statusName||'').trim();
+  if (e === 'COMPLETE') return 'final';
+  if (e === 'WORKING') return 'progress';
+  if (e === 'TO DO') return 'pending';
+  if (e === 'ON PAUSE') return 'blocked';
+  if (statusCategoryKey === 'done') return 'final';
+  if (statusCategoryKey === 'indeterminate') return 'progress';
+  return 'pending';
+}
+
+function transformProductosData(issues, fieldNames) {
+  const uxIssues = issues.filter(i => i.key.startsWith('UXUI-'));
+  const spFieldId = findFieldIdProd(fieldNames, 'story point estimate') || findFieldIdProd(fieldNames, 'story points');
+
+  const MESES_MOSTRAR = [4,5,6,7];
+  function mesDe(issue) {
+    const res = issue.fields.resolutiondate ? new Date(issue.fields.resolutiondate) : null;
+    if (res) return res.getMonth()+1;
+    const upd = issue.fields.updated ? new Date(issue.fields.updated) : null;
+    if (upd) return upd.getMonth()+1;
+    return null;
+  }
+
+  const itemsMostrados = uxIssues.filter(i => MESES_MOSTRAR.includes(mesDe(i)));
+
+  function fmtDate(s) {
+    if (!s) return '';
+    const d = new Date(s);
+    if (isNaN(d)) return '';
+    return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  }
+
+  const asignC = {};
+  itemsMostrados.forEach(i => {
+    const p = i.fields.assignee && i.fields.assignee.displayName;
+    if (p) asignC[p] = (asignC[p]||0)+1;
+  });
+  const porAsignado = Object.entries(asignC).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([persona,cantidad])=>({persona,cantidad}));
+
+  const epicaC = {};
+  itemsMostrados.forEach(i => {
+    const p = i.fields.parent && i.fields.parent.fields && i.fields.parent.fields.summary;
+    if (p) epicaC[p] = (epicaC[p]||0)+1;
+  });
+  const porEpica = Object.entries(epicaC).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([epica,cantidad])=>({epica,cantidad}));
+
+  const onTime = {}, comparable = {};
+  itemsMostrados.forEach(i => {
+    if (i.fields.status.statusCategory && i.fields.status.statusCategory.key === 'done') {
+      const resuelta = i.fields.resolutiondate ? new Date(i.fields.resolutiondate) : null;
+      const due = i.fields.duedate ? new Date(i.fields.duedate) : null;
+      const resp = i.fields.assignee && i.fields.assignee.displayName;
+      if (resuelta && due && resp) {
+        comparable[resp] = (comparable[resp]||0)+1;
+        if (resuelta <= due) onTime[resp] = (onTime[resp]||0)+1;
+      }
+    }
+  });
+  const cumplimiento = Object.keys(comparable).map(p => ({
+    persona: p, aTiempo: onTime[p]||0, tardia: comparable[p]-(onTime[p]||0), total: comparable[p], pct: Math.round((onTime[p]||0)/comparable[p]*100)
+  })).sort((a,b)=> b.pct-a.pct || b.total-a.total);
+
+  const spC = {};
+  itemsMostrados.forEach(i => {
+    const p = i.fields.assignee && i.fields.assignee.displayName;
+    const v = spFieldId ? parseFloat(i.fields[spFieldId]) || 0 : 0;
+    if (p) spC[p] = (spC[p]||0) + v;
+  });
+  const cargaSP = Object.entries(spC).sort((a,b)=>b[1]-a[1]).slice(0,12).map(([persona,sp])=>({persona, sp: Math.round(sp*10)/10}));
+
+  const noFinal = itemsMostrados.filter(i => !(i.fields.status.statusCategory && i.fields.status.statusCategory.key==='done'));
+  const noFinalizadas = noFinal.map(i => ({
+    key: i.key, desc: (i.fields.summary||'').slice(0,80),
+    resp: (i.fields.assignee && i.fields.assignee.displayName) || 'Sin asignar',
+    status: badgeEstadoProd(i.fields.status.name, i.fields.status.statusCategory && i.fields.status.statusCategory.key),
+    deadline: fmtDate(i.fields.duedate)
+  })).sort((a,b)=> (a.deadline||'9999').localeCompare(b.deadline||'9999'));
+
+  const total = itemsMostrados.length;
+  const finalizadas = itemsMostrados.filter(i => i.fields.status.statusCategory && i.fields.status.statusCategory.key==='done').length;
+  const efectividad = total ? Math.round(finalizadas/total*1000)/10 : 0;
+
+  return {
+    consolidado: { finalizadas, total, efectividad, porAsignado, porEpica, cumplimiento, cargaSP, noFinalizadas }
+  };
+}
+
+function setSyncStatusProd(msg, cls) {
+  const el = document.getElementById('sync-status');
+  el.textContent = msg;
+  el.className = 'sync-status' + (cls ? ' '+cls : '');
+}
+
+async function syncFromJira() {
+  const btn = document.getElementById('btn-sync');
+  btn.disabled = true;
+  setSyncStatusProd('🔄 Sincronizando con Jira...', '');
+  try {
+    const resp = await fetch('/.netlify/functions/jira-sync');
+    const json = await resp.json();
+    if (!resp.ok || json.error) {
+      setSyncStatusProd('⚠️ ' + (json.error || 'Error al sincronizar'), 'error');
+      btn.disabled = false;
+      return;
+    }
+    const uxCount = json.issues.filter(i=>i.key.startsWith('UXUI-')).length;
+    if (!uxCount) {
+      setSyncStatusProd('⚠️ No llegaron tickets de UXUI — revisá el JQL en Supabase', 'error');
+      btn.disabled = false;
+      return;
+    }
+    DATA = transformProductosData(json.issues, json.fieldNames);
+    renderAll();
+    setSyncStatusProd('✅ Sincronizado — ' + uxCount + ' tickets de UXUI (' + new Date().toLocaleTimeString('es-PY') + ')', 'ok');
+  } catch (e) {
+    setSyncStatusProd('⚠️ Error de conexión: ' + e.message, 'error');
+  }
+  btn.disabled = false;
+}
+</script>
+</script>
+</body>
+</html>

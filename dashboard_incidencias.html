@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ══════════════════════════════════════════════
+// ⚠️  REEMPLAZÁ ESTOS DOS VALORES
+const SUPABASE_URL = 'https://qszzabybiieolnajaszk.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzenphYnliaWllb2xuYWphc3prIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNjUyMTQsImV4cCI6MjA5NjY0MTIxNH0.8If32to25vLkIvEP0NpaI1T9RDRLp_wP7DrI1Q5yJPA';
+// ══════════════════════════════════════════════
+(async () => {
+  const { createClient } = supabase;
+  const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; }
+  else { window._userEmail = session.user.email; }
+})();
+</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incidencias TU — Dashboard PM</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin:0; padding:0; }
+  body { font-family:'Segoe UI', system-ui, sans-serif; background:#f4f3ef; color:#1a1a18; min-height:100vh; }
+  .container { max-width: 1180px; margin:0 auto; padding: 1.75rem 1.5rem 3rem; }
+
+  #_auth-bar { display:flex; align-items:center; justify-content:space-between; padding:10px 24px; background:#fff; border-bottom:1px solid #e5e4de; font-size:13px; color:#7a7a72; position:sticky; top:0; z-index:100; }
+  .btn-logout { padding:5px 14px; border-radius:7px; border:1px solid #d0cfc8; background:#fff; font-size:12px; font-weight:600; cursor:pointer; color:#941818; font-family:inherit; }
+
+  .header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; flex-wrap:wrap; gap:12px; }
+  .header-left h1 { font-size:22px; font-weight:700; color:#1a1a18; letter-spacing:-0.01em; }
+  .header-left .subtitle { font-size:13px; color:#8a8578; margin-top:2px; }
+  .nav-btns { display:flex; gap:8px; flex-wrap:wrap; }
+  .nav-btn { padding:8px 14px; border-radius:8px; border:1px solid #e2e0d8; background:#fff; font-size:12.5px; font-weight:600; cursor:pointer; color:#5c584f; text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:border-color .15s,color .15s; }
+  .nav-btn:hover { border-color:#c8c6bc; color:#1a1a18; }
+  .btn-sync { background:#941818; border-color:#941818; color:#fff; font-weight:700; cursor:pointer; }
+  .btn-sync:hover { background:#7a1414; border-color:#7a1414; color:#fff; }
+  .btn-sync:disabled { opacity:0.6; cursor:wait; }
+  .sync-status { font-size:12px; color:#8a8578; margin:0 0 1.25rem; min-height:16px; }
+  .sync-status.error { color:#a02020; }
+  .sync-status.ok { color:#2d7a27; }
+
+  .bignums { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:1.5rem; }
+  .bn-card { background:#fff; border:1px solid #ece9e0; border-radius:12px; padding:16px 18px; position:relative; overflow:hidden; }
+  .bn-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--accent); opacity:.8; }
+  .bn-label { font-size:11.5px; color:#948e80; font-weight:600; text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
+  .bn-num { font-size:28px; font-weight:800; color:var(--accent); letter-spacing:-0.02em; }
+  .bn-sub { font-size:11.5px; color:#a8a297; margin-top:2px; }
+
+  .charts-grid { display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:1.5rem; }
+  .chart-card { background:#fff; border:1px solid #ece9e0; border-radius:12px; padding:18px 20px; }
+  .chart-title { font-size:13px; font-weight:700; color:#3a3a38; margin-bottom:3px; }
+  .chart-sub { font-size:11.5px; color:#a8a297; margin-bottom:14px; }
+  .chart-box { position:relative; height:220px; }
+
+  .rank-row { display:flex; align-items:center; gap:10px; margin-bottom:9px; }
+  .rank-name { font-size:12.5px; color:#3a3a38; width:150px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
+  .rank-track { flex:1; background:#f0efe9; border-radius:6px; height:9px; overflow:hidden; }
+  .rank-fill { height:100%; border-radius:6px; }
+  .rank-pct { font-size:12px; font-weight:700; color:#3a3a38; width:60px; text-align:right; }
+
+  .badge { display:inline-block; padding:3px 9px; border-radius:999px; font-size:10.5px; font-weight:700; white-space:nowrap; }
+  .b-final{background:#d4f0e6;color:#0a5e42;} .b-progress{background:#ddeaf8;color:#1053a0;}
+  .b-pending{background:#fdefd4;color:#7a4800;} .b-blocked{background:#fde4e4;color:#941818;}
+  .prio-Highest{color:#941818;font-weight:800;} .prio-High{color:#c47a00;font-weight:700;}
+  .prio-Medium{color:#5c584f;} .prio-Low{color:#a8a297;}
+
+  .task-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid #f5f4ee; font-size:12.5px; flex-wrap:wrap; }
+  .task-row:first-child { border-top:none; }
+  .task-key { font-weight:700; color:#3a3a38; width:70px; flex-shrink:0; font-size:11.5px; }
+  .task-desc { flex:1; min-width:180px; }
+  .task-meta { color:#a8a297; font-size:11.5px; }
+  .dias-chip { font-size:11px; font-weight:800; padding:2px 8px; border-radius:20px; }
+
+  .last-updated { font-size:11.5px; color:#b0afa8; margin-top:1.5rem; text-align:right; }
+
+  @media (max-width:900px) { .charts-grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div id="_auth-bar">
+  <span>📋 Dashboard PM &nbsp;·&nbsp; <strong id="_user-email" style="color:#1a1a18"></strong></span>
+  <button class="btn-logout" onclick="(async()=>{const {createClient}=supabase;const sb=createClient('https://qszzabybiieolnajaszk.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzenphYnliaWllb2xuYWphc3prIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNjUyMTQsImV4cCI6MjA5NjY0MTIxNH0.8If32to25vLkIvEP0NpaI1T9RDRLp_wP7DrI1Q5yJPA');await sb.auth.signOut();window.location.href='index.html';})()">Cerrar sesión</button>
+</div>
+<script>document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('_user-email');if(el&&window._userEmail)el.textContent=window._userEmail;});</script>
+
+<div class="container">
+  <div class="header">
+    <div class="header-left">
+      <h1>🚨 Incidencias TU</h1>
+      <div class="subtitle" id="dashdate"></div>
+    </div>
+    <div class="nav-btns">
+      <button class="nav-btn btn-sync" id="btn-sync" onclick="syncFromJira()">🔄 Sincronizar con Jira</button>
+      <a class="nav-btn" href="dashboard_app_1.html">📱 APP TU</a>
+      <a class="nav-btn" href="dashboard_web_2.html">🌐 WEB TU</a>
+      <a class="nav-btn" href="dashboard_productos.html">🧩 Productos Digitales</a>
+      <a class="nav-btn" href="index.html">← Inicio</a>
+    </div>
+  </div>
+  <div class="sync-status" id="sync-status"></div>
+
+  <div class="bignums">
+    <div class="bn-card" style="--accent:#941818"><div class="bn-label">Total incidencias</div><div class="bn-num" id="bn-total">0</div><div class="bn-sub">históricas registradas</div></div>
+    <div class="bn-card" style="--accent:#1558a0"><div class="bn-label">Abiertas actualmente</div><div class="bn-num" id="bn-abiertas">0</div><div class="bn-sub">en curso o en espera</div></div>
+    <div class="bn-card" style="--accent:#c47a00"><div class="bn-label">Vencidas sin cerrar</div><div class="bn-num" id="bn-vencidas">0</div><div class="bn-sub">requieren atención</div></div>
+    <div class="bn-card" style="--accent:#2d7a27"><div class="bn-label">Tiempo promedio de resolución</div><div class="bn-num" id="bn-tiempo">0</div><div class="bn-sub">días desde creación a cierre</div></div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:1.5rem;">
+    <div class="chart-title">⏳ Incidencias abiertas — antigüedad</div>
+    <div class="chart-sub">Ordenadas de más antigua a más reciente</div>
+    <div id="abiertas-list"></div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:1.5rem;">
+    <div class="chart-title">📅 Incidencias por mes</div>
+    <div class="chart-sub">Cantidad creada y finalizada por mes, con tiempo promedio de resolución</div>
+    <div class="chart-box"><canvas id="mesChart"></canvas></div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Estado general</div>
+      <div class="chart-box"><canvas id="estadoChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Por tipo de incidencia</div>
+      <div class="chart-sub">Error = bug · Tarea = trabajo planificado</div>
+      <div class="chart-box"><canvas id="tipoChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:1.5rem;">
+    <div class="chart-title">Por prioridad — cantidad y tiempo de resolución</div>
+    <div class="chart-sub">Días promedio desde creación hasta cierre, por nivel de prioridad</div>
+    <div id="rank-prioridad"></div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Por categoría (etiqueta)</div>
+      <div class="chart-sub">Fix, Soporte, Mejora, UI, Pruebas</div>
+      <div id="rank-etiqueta"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Por asignado</div>
+      <div class="chart-sub">Cantidad total de incidencias</div>
+      <div id="rank-asignado"></div>
+    </div>
+  </div>
+
+  <div class="last-updated" id="last-updated"></div>
+</div>
+
+<script>
+const DATA = {"bigNumbers": {"total": 81, "abiertas": 6, "vencidas": 0, "tiempoPromedioResolucion": 2.9}, "porEstado": {"final": 75, "progress": 5, "pending": 1, "blocked": 0}, "porTipo": [{"tipo": "Tarea", "cantidad": 44}, {"tipo": "Error", "cantidad": 28}, {"tipo": "Visualización de datos", "cantidad": 4}, {"tipo": "Subtarea", "cantidad": 3}, {"tipo": "Otros", "cantidad": 2}], "porPrioridad": {"Highest": {"cantidad": 2, "tiempoPromedio": 1.9}, "High": {"cantidad": 7, "tiempoPromedio": 1.4}, "Medium": {"cantidad": 67, "tiempoPromedio": 3.3}, "Low": {"cantidad": 5, "tiempoPromedio": 0.6}}, "porEtiqueta": [{"etiqueta": "Fix", "cantidad": 29}, {"etiqueta": "Soporte", "cantidad": 12}, {"etiqueta": "Mejora", "cantidad": 3}, {"etiqueta": "UI", "cantidad": 2}, {"etiqueta": "Pruebas", "cantidad": 1}], "porAsignado": [{"persona": "Luis Meza", "cantidad": 34}, {"persona": "Nathalia Domecq", "cantidad": 28}, {"persona": "Pablo Cesar Acosta", "cantidad": 6}, {"persona": "Pedro Duarte", "cantidad": 4}, {"persona": "Bruno Lird", "cantidad": 2}], "abiertas": [{"key": "IB-102", "desc": "Error Cambio clave de acceso/Transaccional", "resp": "Nathalia Domecq", "status": "progress", "prioridad": "High", "diasAbierta": 50}, {"key": "IB-105", "desc": "Onboarding update de tabla solicitudes", "resp": "Nathalia Domecq", "status": "progress", "prioridad": "Medium", "diasAbierta": 47}, {"key": "IB-100", "desc": "Caja Desembolso Duplicada", "resp": "Pedro Duarte", "status": "progress", "prioridad": "Highest", "diasAbierta": 33}, {"key": "IB-107", "desc": "Validaciones error de listado de cuentas para clientes con desembolso", "resp": "Luis Meza", "status": "progress", "prioridad": "Medium", "diasAbierta": 13}, {"key": "IB-97", "desc": "Error en Onboarding", "resp": "Sin asignar", "status": "pending", "prioridad": "Medium", "diasAbierta": 11}, {"key": "IB-114", "desc": "Cliente con error al pagar QR", "resp": "Luis Meza", "status": "progress", "prioridad": "Medium", "diasAbierta": 0}], "porMes": [{"mes": "Mayo", "total": 18, "finalizadas": 18, "tiempoPromedio": 1.8}, {"mes": "Junio", "total": 33, "finalizadas": 30, "tiempoPromedio": 4.6}, {"mes": "Julio", "total": 30, "finalizadas": 27, "tiempoPromedio": 1.8}]}
+;
+const statusMap = { final:{label:'Finalizado',cls:'b-final'}, progress:{label:'En curso',cls:'b-progress'}, pending:{label:'En espera',cls:'b-pending'}, blocked:{label:'Bloqueado',cls:'b-blocked'} };
+const rankColors = ['#941818','#c04040','#d97a7a','#e8a8a8','#7a1414','#b03030'];
+
+document.getElementById('bn-total').textContent = DATA.bigNumbers.total;
+document.getElementById('bn-abiertas').textContent = DATA.bigNumbers.abiertas;
+document.getElementById('bn-vencidas').textContent = DATA.bigNumbers.vencidas;
+document.getElementById('bn-tiempo').textContent = DATA.bigNumbers.tiempoPromedioResolucion + 'd';
+
+document.getElementById('abiertas-list').innerHTML = DATA.abiertas.length ? DATA.abiertas.map(a=>{
+  const diasColor = a.diasAbierta>=30 ? '#941818' : a.diasAbierta>=14 ? '#c47a00' : '#2d7a27';
+  const diasBg = a.diasAbierta>=30 ? '#fde4e4' : a.diasAbierta>=14 ? '#fdefd4' : '#e2f0db';
+  return `<div class="task-row">
+    <span class="task-key">${a.key}</span>
+    <span class="badge ${statusMap[a.status].cls}">${statusMap[a.status].label}</span>
+    <span class="prio-${a.prioridad}">${a.prioridad}</span>
+    <span class="task-desc"><strong>${a.desc}</strong></span>
+    <span class="task-meta">${a.resp}</span>
+    <span class="dias-chip" style="color:${diasColor};background:${diasBg}">${a.diasAbierta} días</span>
+  </div>`;
+}).join('') : '<div style="font-size:12px;color:#a8a297;">No hay incidencias abiertas 🎉</div>';
+
+new Chart(document.getElementById('mesChart'), {
+  type: 'bar',
+  data: {
+    labels: DATA.porMes.map(m=>m.mes),
+    datasets: [
+      { label:'Creadas', data: DATA.porMes.map(m=>m.total), backgroundColor:'#e7e5dc', borderRadius:8, maxBarThickness:44, yAxisID:'y' },
+      { label:'Finalizadas', data: DATA.porMes.map(m=>m.finalizadas), backgroundColor:'#941818', borderRadius:8, maxBarThickness:44, yAxisID:'y' },
+      { label:'Días prom. resolución', data: DATA.porMes.map(m=>m.tiempoPromedio), type:'bar', backgroundColor:'#1558a0', borderRadius:8, maxBarThickness:44, yAxisID:'y1' }
+    ]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ position:'top', align:'end', labels:{boxWidth:10,usePointStyle:true,pointStyle:'circle',font:{size:11.5}}} },
+    scales:{
+      y:{ beginAtZero:true, ticks:{precision:0}, grid:{display:false}, position:'left', title:{display:true,text:'Cantidad',font:{size:10.5}} },
+      y1:{ beginAtZero:true, position:'right', grid:{display:false}, title:{display:true,text:'Días',font:{size:10.5}} },
+      x:{ grid:{display:false} }
+    }
+  }
+});
+
+new Chart(document.getElementById('estadoChart'), {
+  type:'doughnut',
+  data:{ labels:['Finalizado','En curso','En espera'], datasets:[{data:[DATA.porEstado.final,DATA.porEstado.progress,DATA.porEstado.pending], backgroundColor:['#2d7a27','#1558a0','#c47a00'], borderWidth:3, borderColor:'#fff'}] },
+  options:{ responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{legend:{position:'bottom',labels:{boxWidth:9,font:{size:11}}}} }
+});
+
+new Chart(document.getElementById('tipoChart'), {
+  type:'bar',
+  data:{ labels: DATA.porTipo.map(t=>t.tipo), datasets:[{data: DATA.porTipo.map(t=>t.cantidad), backgroundColor:'#941818', borderRadius:6, maxBarThickness:36}] },
+  options:{ responsive:true, maintainAspectRatio:false, indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{beginAtZero:true,ticks:{precision:0},grid:{display:false}}, y:{grid:{display:false}}} }
+});
+
+const prioOrder = ['Highest','High','Medium','Low'];
+const maxPrioCant = Math.max(...prioOrder.map(p=>DATA.porPrioridad[p]?.cantidad||0));
+document.getElementById('rank-prioridad').innerHTML = prioOrder.map((p,i)=>{
+  const d = DATA.porPrioridad[p] || {cantidad:0,tiempoPromedio:0};
+  const pct = maxPrioCant ? Math.round(d.cantidad/maxPrioCant*100) : 0;
+  return `<div class="rank-row">
+    <div class="rank-name prio-${p}">${p}</div>
+    <div class="rank-track"><div class="rank-fill" style="width:${pct}%;background:${rankColors[i]}"></div></div>
+    <div class="rank-pct">${d.cantidad} · ${d.tiempoPromedio}d</div>
+  </div>`;
+}).join('');
+
+const maxEtiq = DATA.porEtiqueta[0]?.cantidad || 1;
+document.getElementById('rank-etiqueta').innerHTML = DATA.porEtiqueta.map((e,i)=>`
+  <div class="rank-row">
+    <div class="rank-name" title="${e.etiqueta}">${e.etiqueta}</div>
+    <div class="rank-track"><div class="rank-fill" style="width:${Math.round(e.cantidad/maxEtiq*100)}%;background:${rankColors[i%rankColors.length]}"></div></div>
+    <div class="rank-pct">${e.cantidad}</div>
+  </div>`).join('');
+
+const maxAsig = DATA.porAsignado[0]?.cantidad || 1;
+document.getElementById('rank-asignado').innerHTML = DATA.porAsignado.map((p,i)=>`
+  <div class="rank-row">
+    <div class="rank-name" title="${p.persona}">${p.persona}</div>
+    <div class="rank-track"><div class="rank-fill" style="width:${Math.round(p.cantidad/maxAsig*100)}%;background:${rankColors[i%rankColors.length]}"></div></div>
+    <div class="rank-pct">${p.cantidad}</div>
+  </div>`).join('');
+
+document.getElementById('dashdate').textContent = new Date().toLocaleDateString('es-PY',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+document.getElementById('last-updated').textContent = 'Última actualización: ' + new Date().toLocaleString('es-PY');
+
+function setSyncStatus(msg, cls) {
+  const el = document.getElementById('sync-status');
+  el.textContent = msg;
+  el.className = 'sync-status' + (cls ? ' '+cls : '');
+}
+
+async function syncFromJira() {
+  const btn = document.getElementById('btn-sync');
+  btn.disabled = true;
+  setSyncStatus('🔄 Sincronizando con Jira...', '');
+  try {
+    const resp = await fetch('/.netlify/functions/jira-sync');
+    const json = await resp.json();
+    if (!resp.ok || json.error) {
+      setSyncStatus('⚠️ ' + (json.error || 'Error al sincronizar') + ' — recordá agregar el proyecto IB al JQL en Supabase (project in (DIG, UXUI, IB))', 'error');
+      btn.disabled = false;
+      return;
+    }
+    const ibIssues = json.issues.filter(i => i.key.startsWith('IB-'));
+    if (!ibIssues.length) {
+      setSyncStatus('⚠️ No llegaron tickets de IB — revisá que el JQL en Supabase incluya "project in (..., IB)"', 'error');
+      btn.disabled = false;
+      return;
+    }
+    setSyncStatus('✅ Sincronizado — ' + ibIssues.length + ' tickets de IB recibidos (' + new Date().toLocaleTimeString('es-PY') + ')', 'ok');
+    // Nota: la transformación completa a este formato de dashboard se agrega en la próxima iteración.
+  } catch (e) {
+    setSyncStatus('⚠️ Error de conexión: ' + e.message, 'error');
+  }
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
