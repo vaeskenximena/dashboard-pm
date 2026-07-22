@@ -61,13 +61,31 @@ exports.handler = async function (event) {
     let fieldNames = {};
     let nextPageToken = null;
 
+    // 3a. Descubrir los campos personalizados que necesitamos (una sola llamada liviana)
+    const fieldsListResp = await fetch(`https://${config.dominio}/rest/api/3/field`, {
+      headers: { 'Authorization': authHeader, 'Accept': 'application/json' }
+    });
+    let neededCustomIds = [];
+    if (fieldsListResp.ok) {
+      const allFields = await fieldsListResp.json();
+      const wanted = ['story point estimate', 'story points', 'fecha de inicio', 'start date', 'sprint'];
+      allFields.forEach(f => {
+        fieldNames[f.id] = f.name;
+        if (wanted.includes((f.name||'').toLowerCase())) neededCustomIds.push(f.id);
+      });
+    }
+
+    const baseFields = ['summary','status','assignee','duedate','resolutiondate','updated','created',
+      'issuetype','parent','priority','labels','reporter'];
+    const fieldsToRequest = [...baseFields, ...neededCustomIds];
+
+    // 3b. Buscar los issues, pidiendo solo los campos necesarios (no *all) para no exceder el límite de tamaño de Netlify
     while (allIssues.length < 2000) {
       const jiraUrl = `https://${config.dominio}/rest/api/3/search/jql`;
       const body = {
         jql,
         maxResults: 100,
-        fields: ['*all'],
-        expand: 'names'
+        fields: fieldsToRequest
       };
       if (nextPageToken) body.nextPageToken = nextPageToken;
 
@@ -87,7 +105,6 @@ exports.handler = async function (event) {
 
       const data = await jiraResp.json();
       allIssues = allIssues.concat(data.issues || []);
-      if (data.names && Object.keys(fieldNames).length === 0) fieldNames = data.names;
 
       if (data.isLast || !data.issues || data.issues.length === 0 || !data.nextPageToken) break;
       nextPageToken = data.nextPageToken;
