@@ -751,9 +751,15 @@ async function syncFromJira() {
   setSyncStatus('🔄 Sincronizando con Jira...', '');
   try {
     const resp = await fetch('/.netlify/functions/jira-sync');
-    const json = await resp.json();
+    let json;
+    const rawText = await resp.text();
+    try { json = JSON.parse(rawText); } catch(parseErr) {
+      setSyncStatus('⚠️ Respuesta inesperada del servidor (HTTP ' + resp.status + '): ' + rawText.slice(0,200), 'error');
+      btn.disabled = false;
+      return;
+    }
     if (!resp.ok || json.error) {
-      setSyncStatus('⚠️ ' + (json.error || 'Error al sincronizar') + (json.detail ? ' — ' + JSON.stringify(json.detail).slice(0,200) : ''), 'error');
+      setSyncStatus('⚠️ (HTTP ' + resp.status + ') ' + (json.error || 'Error al sincronizar') + (json.detail ? ' — ' + JSON.stringify(json.detail).slice(0,200) : ''), 'error');
       btn.disabled = false;
       return;
     }

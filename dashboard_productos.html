@@ -349,9 +349,15 @@ async function syncFromJira() {
   setSyncStatusProd('🔄 Sincronizando con Jira...', '');
   try {
     const resp = await fetch('/.netlify/functions/jira-sync');
-    const json = await resp.json();
+    let json;
+    const rawText = await resp.text();
+    try { json = JSON.parse(rawText); } catch(parseErr) {
+      setSyncStatusProd('⚠️ Respuesta inesperada del servidor (HTTP ' + resp.status + '): ' + rawText.slice(0,200), 'error');
+      btn.disabled = false;
+      return;
+    }
     if (!resp.ok || json.error) {
-      setSyncStatusProd('⚠️ ' + (json.error || 'Error al sincronizar'), 'error');
+      setSyncStatusProd('⚠️ (HTTP ' + resp.status + ') ' + (json.error || 'Error al sincronizar'), 'error');
       btn.disabled = false;
       return;
     }
