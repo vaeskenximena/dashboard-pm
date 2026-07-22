@@ -769,6 +769,9 @@ async function syncFromJira() {
   }
   btn.disabled = false;
 }
+
+// Sincroniza sola al abrir la página, sin esperar el clic
+syncFromJira();
 </script>
 </body>
 </html>
