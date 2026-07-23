@@ -250,8 +250,10 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
           </div>
         </div>
 
-        <div class="perf-note">
-          ⚠️ <b>Sobre "sin tareas asignadas":</b> Jira solo me dice quién <i>tiene</i> algo asignado, no la nómina completa de tu equipo. Para saber quién está en cero, pasame la lista completa de integrantes y la cruzo contra esto.
+        <div class="chart-card">
+          <div class="chart-title">🚫 Sin tareas asignadas</div>
+          <div class="chart-sub">Cruzando tu nómina contra quién tiene algo asignado hoy en Jira</div>
+          <div id="perf-sin-tareas"></div>
         </div>
       </div>
     </div>
@@ -385,6 +387,16 @@ function renderRankCarga() {
   }).join('');
 }
 
+const EQUIPO_APP_TU = [
+  'Luis Meza','Gaston Romero','Camila Alderete','Koichi Nagasawa','Antonella Miho',
+  'Juan Ovelar','Juan Mendez','Pedro Duarte','Bruno Lird','Federico Ñamandu',
+  'Pablo Acosta','Hector Barral','Jacqueline Gill','Alejandro Martinez','Edgardo Moises Silva'
+];
+
+function normalizaNombre(s) {
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+}
+
 function openPerfModal() {
   const p = DATA.performance;
   document.getElementById('perf-total').textContent = p.totalTareasGlobal;
@@ -430,6 +442,29 @@ function openPerfModal() {
       <div class="rank-pct">${w.cantidad}</div>
     </div>`;
   }).join('');
+
+  const asignadosNorm = (p.todosAsignados||[]).map(a => normalizaNombre(a).split(/\s+/).filter(w=>w.length>1));
+  const sinTareas = [];
+  const posiblesTypo = [];
+  EQUIPO_APP_TU.forEach(nombre => {
+    const palabras = normalizaNombre(nombre).split(/\s+/).filter(w=>w.length>1);
+    const matchCompleto = asignadosNorm.some(a => palabras.every(pw => a.includes(pw)));
+    if (matchCompleto) return;
+    const matchParcial = asignadosNorm.some(a => palabras.some(pw => a.includes(pw)));
+    if (matchParcial) posiblesTypo.push(nombre); else sinTareas.push(nombre);
+  });
+
+  let sinTareasHtml = '';
+  if (sinTareas.length) {
+    sinTareasHtml += `<div style="margin-bottom:10px;"><b style="font-size:12.5px;color:#941818;">Sin ninguna tarea asignada (${sinTareas.length}):</b><br>` +
+      sinTareas.map(n=>`<span class="badge b-blocked" style="margin:4px 4px 0 0;">${n}</span>`).join('') + `</div>`;
+  } else {
+    sinTareasHtml += `<div style="font-size:12px;color:#2d7a27;margin-bottom:10px;">Todo tu equipo tiene al menos una tarea asignada 🎉</div>`;
+  }
+  if (posiblesTypo.length) {
+    sinTareasHtml += `<div style="font-size:11.5px;color:#a8a297;">⚠️ No encontré coincidencia exacta para: ${posiblesTypo.join(', ')} — puede ser diferencia de tilde/apellido en Jira, revisá manualmente.</div>`;
+  }
+  document.getElementById('perf-sin-tareas').innerHTML = sinTareasHtml;
 
   document.getElementById('perf-modal-overlay').classList.add('open');
 }
@@ -723,6 +758,13 @@ function transformAppTuData(issues, fieldNames) {
   });
   const wip = Object.entries(wipMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([persona,cantidad])=>({persona,cantidad}));
 
+  const todosAsignadosSet = new Set();
+  digIssues.forEach(i => {
+    const resp = i.fields.assignee && i.fields.assignee.displayName;
+    if (resp) todosAsignadosSet.add(resp);
+  });
+  const todosAsignados = [...todosAsignadosSet];
+
   return {
     epics,
     mejoraContinua: { total: mcItems.length, listo: mcListo, pct: mcItems.length ? Math.round(mcListo/mcItems.length*100):0, items: mcOut },
@@ -734,7 +776,7 @@ function transformAppTuData(issues, fieldNames) {
         const isDone = i.fields.status.statusCategory && i.fields.status.statusCategory.key === 'done';
         return due && !isDone && due<today && ['Highest','High'].includes(i.fields.priority && i.fields.priority.name);
       }).length,
-      cumplimiento, vencidasPorPersona, wip
+      cumplimiento, vencidasPorPersona, wip, todosAsignados
     }
   };
 }
