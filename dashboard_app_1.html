@@ -251,11 +251,14 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div>
         <div class="chart-title">Carga de trabajo por persona</div>
-        <div class="chart-sub">Cantidad de ítems asignados (todos los tipos)</div>
+        <div class="chart-sub">Dividido por estado — Finalizadas/Publicadas vs. En curso/Pausa/Por hacer</div>
       </div>
       <button class="btn-perf" onclick="openPerfModal()">📊 Performance equipo</button>
     </div>
-    <div id="rank-carga"></div>
+    <div style="font-size:11.5px;font-weight:700;color:#2d7a27;text-transform:uppercase;letter-spacing:.04em;margin:14px 0 8px;">Finalizadas / Publicadas</div>
+    <div id="rank-carga-fin" style="margin-bottom:16px;"></div>
+    <div style="font-size:11.5px;font-weight:700;color:#1558a0;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">En curso / En pausa / Por hacer</div>
+    <div id="rank-carga-curso"></div>
   </div>
 
   <!-- Modal Performance Equipo -->
@@ -420,15 +423,19 @@ function renderRankVolumen() {
 }
 
 function renderRankCarga() {
-  const max = DATA.cargaTrabajo[0]?.cantidad || 1;
-  document.getElementById('rank-carga').innerHTML = DATA.cargaTrabajo.map((c,i)=>{
-    const pct = Math.round(c.cantidad/max*100);
-    return `<div class="rank-row">
-      <div class="rank-name" title="${c.persona}">${c.persona}</div>
-      <div class="rank-track"><div class="rank-fill" style="width:${pct}%;background:${rankColors[i%rankColors.length]}"></div></div>
-      <div class="rank-pct">${c.cantidad}</div>
-    </div>`;
-  }).join('');
+  function pintar(elId, lista, color) {
+    const max = lista[0]?.cantidad || 1;
+    document.getElementById(elId).innerHTML = lista.length ? lista.map(c=>{
+      const pct = Math.round(c.cantidad/max*100);
+      return `<div class="rank-row">
+        <div class="rank-name" title="${c.persona}">${c.persona}</div>
+        <div class="rank-track"><div class="rank-fill" style="width:${pct}%;background:${color}"></div></div>
+        <div class="rank-pct">${c.cantidad}</div>
+      </div>`;
+    }).join('') : '<div style="font-size:12px;color:#a8a297;">Sin datos.</div>';
+  }
+  pintar('rank-carga-fin', DATA.cargaFin || [], '#2d7a27');
+  pintar('rank-carga-curso', DATA.cargaCurso || [], '#1558a0');
 }
 
 const EQUIPO_APP_TU = [
@@ -851,13 +858,22 @@ function transformAppTuData(issues, fieldNames) {
 
   // Carga de trabajo por persona
   const cargaMap = {};
+  const cargaFinMap = {};
+  const cargaCursoMap = {};
   digIssues.forEach(i => {
     if (leafTypes.includes(i.fields.issuetype.name)) {
       const resp = i.fields.assignee && i.fields.assignee.displayName;
-      if (resp) cargaMap[resp] = (cargaMap[resp]||0) + 1;
+      if (resp) {
+        cargaMap[resp] = (cargaMap[resp]||0) + 1;
+        const st = badgeEstadoJS(i.fields.status.name, i.fields.status.statusCategory && i.fields.status.statusCategory.name);
+        if (st === 'final') cargaFinMap[resp] = (cargaFinMap[resp]||0) + 1;
+        else cargaCursoMap[resp] = (cargaCursoMap[resp]||0) + 1;
+      }
     }
   });
   const cargaTrabajo = Object.entries(cargaMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([persona,cantidad])=>({persona,cantidad}));
+  const cargaFin = Object.entries(cargaFinMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([persona,cantidad])=>({persona,cantidad}));
+  const cargaCurso = Object.entries(cargaCursoMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([persona,cantidad])=>({persona,cantidad}));
 
   // Performance: cumplimiento, vencidas por persona, WIP
   const onTime = {}, comparable = {};
@@ -906,7 +922,7 @@ function transformAppTuData(issues, fieldNames) {
     mejoraContinua: { total: mcItems.length, listo: mcListo, pct: mcItems.length ? Math.round(mcListo/mcItems.length*100):0, items: mcOut },
     tareaTipo: { total: tareaItems.length, listo: tareaListo, pct: tareaItems.length ? Math.round(tareaListo/tareaItems.length*100):0 },
     bigNumbers: { proyectosEnProgreso, enPausaOBloqueadas: enPausa, vencen7Dias: vencen7, vencidas },
-    cargaTrabajo,
+    cargaTrabajo, cargaFin, cargaCurso,
     performance: { totalTareasGlobal: digIssues.filter(i=>i.fields.issuetype.name!=='Epic').length, vencidasGlobal: vencidas, vencidasAltaPrioridad: digIssues.filter(i=>{
         const due = i.fields[dueFieldId] ? new Date(i.fields[dueFieldId]) : null;
         const isDone = i.fields.status.statusCategory && i.fields.status.statusCategory.key === 'done';
