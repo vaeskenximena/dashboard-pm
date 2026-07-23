@@ -91,6 +91,27 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
   .project-pct { font-weight:700; }
   .chevron { transition:transform .2s; display:inline-block; font-size:11px; color:#a8a297; }
   .chevron.open { transform:rotate(180deg); }
+
+  .mc-ministats { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:18px; }
+  .mc-ministat { background:#faf9f5; border-radius:8px; padding:10px 14px; }
+  .mc-ministat-label { font-size:11.5px; color:#8a8578; margin-bottom:2px; }
+  .mc-ministat-num { font-size:20px; font-weight:700; color:#1a1a18; }
+
+  .mc-timeline { position:relative; padding-left:18px; margin-bottom:6px; }
+  .mc-timeline::before { content:''; position:absolute; left:5px; top:4px; bottom:4px; width:1px; background:#e2e0d8; }
+  .mc-month-group { position:relative; margin-bottom:14px; }
+  .mc-month-dot { position:absolute; left:-18px; top:3px; width:9px; height:9px; border-radius:50%; background:#2d7a27; }
+  .mc-month-dot.sinfecha { background:#a8a297; }
+  .mc-month-label { font-size:11.5px; font-weight:700; color:#a8a297; margin-bottom:6px; }
+  .mc-impl-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; font-size:12.5px; }
+  .mc-avatar { width:20px; height:20px; border-radius:50%; background:#eaf1fa; color:#1558a0; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .mc-avatar.pro { background:#f2ebff; color:#8a3ffc; }
+  .mc-person { display:flex; align-items:center; gap:6px; }
+  .mc-person-name { font-size:11.5px; color:#8a8578; }
+
+  .mc-list-card { border:1px solid #ece9e0; border-radius:12px; overflow:hidden; }
+  .mc-list-row { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; font-size:12.5px; border-top:1px solid #f0efe9; }
+  .mc-list-row:first-child { border-top:none; }
   .col-headers { display:grid; grid-template-columns:2fr 1.1fr 0.85fr 0.75fr 0.85fr 0.75fr; gap:8px; padding:8px 18px; background:#faf9f5; border-top:1px solid #f0efe9; font-size:10.5px; font-weight:700; color:#a8a297; text-transform:uppercase; letter-spacing:.04em; }
   .item-row { display:grid; grid-template-columns:2fr 1.1fr 0.85fr 0.75fr 0.85fr 0.75fr; gap:8px; align-items:center; padding:9px 18px; border-top:1px solid #f5f4ee; font-size:12.5px; }
   .item-pct { font-weight:800; font-size:12.5px; }
@@ -184,8 +205,11 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
   <!-- Mejora continua + tarea tipo -->
   <div class="charts-grid-3">
-    <div class="chart-card">
-      <div class="chart-title">Mejora Continua</div>
+    <div class="chart-card" style="cursor:pointer;" onclick="toggleMcDetail()">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="chart-title">Mejora Continua</div>
+        <span class="chevron open" id="mc-chevron" style="font-size:11px;color:#a8a297;">▼</span>
+      </div>
       <div class="chart-sub" id="mc-sub"></div>
       <div class="donut-row">
         <div class="donut-wrap"><canvas id="donutMC" width="100" height="100"></canvas><div class="donut-center"><div class="donut-pct" id="mc-pct" style="color:#1558a0">0%</div><div class="donut-label">listo</div></div></div>
@@ -200,6 +224,26 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
         <div class="donut-legend" id="tarea-legend"></div>
       </div>
     </div>
+  </div>
+
+  <div class="chart-card" id="mc-detail-panel" style="display:none;margin-bottom:1.5rem;">
+    <div class="mc-ministats">
+      <div class="mc-ministat"><div class="mc-ministat-label">Implementadas</div><div class="mc-ministat-num" id="mc-stat-impl">0</div></div>
+      <div class="mc-ministat"><div class="mc-ministat-label">En curso / pausa</div><div class="mc-ministat-num" id="mc-stat-curso">0</div></div>
+      <div class="mc-ministat"><div class="mc-ministat-label">No iniciadas</div><div class="mc-ministat-num" id="mc-stat-noini" style="color:#c47a00;">0</div></div>
+    </div>
+
+    <div class="chart-title" style="margin-bottom:10px; display:flex; align-items:center; gap:8px;">🚀 Implementadas en PROD / BETA</div>
+    <div id="mc-detail-implementadas"></div>
+
+    <div class="chart-title" style="margin:20px 0 10px; display:flex; align-items:center; gap:8px;">⏱️ En progreso / En pausa</div>
+    <div id="mc-detail-enprogreso" class="mc-list-card"></div>
+
+    <div class="chart-title" style="margin:20px 0 10px; display:flex; align-items:center; gap:8px;">📊 Ranking por persona — Fin vs. en curso</div>
+    <div style="font-size:11.5px;font-weight:700;color:#2d7a27;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Finalizadas / Publicadas</div>
+    <div id="mc-rank-fin" style="margin-bottom:16px;"></div>
+    <div style="font-size:11.5px;font-weight:700;color:#1558a0;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">En curso / En pausa / Por hacer</div>
+    <div id="mc-rank-curso"></div>
   </div>
 
   <!-- Carga de trabajo -->
@@ -495,6 +539,95 @@ function renderMejoraContinua() {
     });
   }
   document.getElementById('mc-legend').innerHTML = labels.map((l,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${colors[i]}"></div>${l}: ${data[i]}</div>`).join('');
+  renderMcDetail();
+}
+
+function toggleMcDetail() {
+  const panel = document.getElementById('mc-detail-panel');
+  const chev = document.getElementById('mc-chevron');
+  const open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : 'block';
+  chev.classList.toggle('open', !open);
+}
+
+const MESES_NOMBRE_MC = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+function mesDeFecha(ddmmyyyy) {
+  if (!ddmmyyyy) return 'Sin fecha';
+  const partes = ddmmyyyy.split('/');
+  if (partes.length!==3) return 'Sin fecha';
+  return MESES_NOMBRE_MC[parseInt(partes[1],10)] + ' ' + partes[2];
+}
+
+function iniciales(nombre) {
+  if (!nombre || nombre==='Sin asignar') return '?';
+  const partes = nombre.trim().split(/\s+/);
+  return (partes[0][0] + (partes[1] ? partes[1][0] : '')).toUpperCase();
+}
+
+function renderMcDetail() {
+  const items = DATA.mejoraContinua.items || [];
+
+  const implementadas = items.filter(it => it.estadoRaw==='Implementado Prod' || it.estadoRaw==='BETA');
+  const enProgresoPausa = items.filter(it => it.estadoRaw==='En progreso' || it.estadoRaw==='EN PAUSA');
+  const noIniciadas = items.filter(it => it.estadoRaw==='Por hacer' || it.estadoRaw==='BACKLOG').length;
+
+  document.getElementById('mc-stat-impl').textContent = implementadas.length;
+  document.getElementById('mc-stat-curso').textContent = enProgresoPausa.length;
+  document.getElementById('mc-stat-noini').textContent = noIniciadas;
+
+  const grupos = {};
+  implementadas.forEach(it => {
+    const mes = mesDeFecha(it.resuelta);
+    grupos[mes] = grupos[mes] || [];
+    grupos[mes].push(it);
+  });
+  const mesesOrdenados = Object.keys(grupos).sort((a,b)=>{
+    if (a==='Sin fecha') return 1; if (b==='Sin fecha') return -1;
+    return 0;
+  });
+
+  document.getElementById('mc-detail-implementadas').innerHTML = mesesOrdenados.length ? `<div class="mc-timeline">` + mesesOrdenados.map(mes => `
+    <div class="mc-month-group">
+      <div class="mc-month-dot ${mes==='Sin fecha'?'sinfecha':''}"></div>
+      <div class="mc-month-label">${mes}</div>
+      ${grupos[mes].map(it=>`
+        <div class="mc-impl-row">
+          <span>${it.desc}</span>
+          <div class="mc-person">
+            <div class="mc-avatar">${iniciales(it.resp)}</div>
+            <span class="mc-person-name">${it.resp}</span>
+          </div>
+        </div>`).join('')}
+    </div>`).join('') + `</div>` : '<div style="font-size:12px;color:#a8a297;">Ninguna implementada en PROD/BETA todavía.</div>';
+
+  document.getElementById('mc-detail-enprogreso').innerHTML = enProgresoPausa.length ? enProgresoPausa.map(it=>`
+    <div class="mc-list-row">
+      <span>${it.desc}</span>
+      <div class="mc-person">
+        <span class="badge ${it.estadoRaw==='EN PAUSA'?'b-blocked':'b-progress'}">${it.estadoRaw==='EN PAUSA'?'En pausa':'En curso'}</span>
+        <div class="mc-avatar pro">${iniciales(it.resp)}</div>
+      </div>
+    </div>`).join('') : '<div style="font-size:12px;color:#a8a297;padding:10px 14px;">Ninguna en curso o en pausa.</div>';
+
+  const finItems = items.filter(it => it.status === 'final');
+  const cursoItems = items.filter(it => it.status !== 'final');
+  const finPorPersona = {};
+  finItems.forEach(it => { finPorPersona[it.resp] = (finPorPersona[it.resp]||0)+1; });
+  const cursoPorPersona = {};
+  cursoItems.forEach(it => { cursoPorPersona[it.resp] = (cursoPorPersona[it.resp]||0)+1; });
+
+  function renderRankPersona(elId, map, color) {
+    const arr = Object.entries(map).sort((a,b)=>b[1]-a[1]);
+    const max = arr[0]?.[1] || 1;
+    document.getElementById(elId).innerHTML = arr.length ? arr.map(([persona,cant])=>`
+      <div class="rank-row">
+        <div class="rank-name" title="${persona}">${persona}</div>
+        <div class="rank-track"><div class="rank-fill" style="width:${Math.round(cant/max*100)}%;background:${color}"></div></div>
+        <div class="rank-pct">${cant}</div>
+      </div>`).join('') : '<div style="font-size:12px;color:#a8a297;">Sin datos.</div>';
+  }
+  renderRankPersona('mc-rank-fin', finPorPersona, '#2d7a27');
+  renderRankPersona('mc-rank-curso', cursoPorPersona, '#1558a0');
 }
 
 function renderTareaTipo() {
@@ -594,7 +727,7 @@ function findFieldId(fieldNames, nameSubstr) {
 
 function badgeEstadoJS(statusName, statusCategory) {
   const e = (statusName||'').trim();
-  if (['Finalizado','Implementado Prod','BETA'].includes(e)) return 'final';
+  if (['Finalizado','Implementado Prod','BETA','Publicado'].includes(e)) return 'final';
   if (e === 'En progreso') return 'progress';
   if (['Por hacer','BACKLOG'].includes(e)) return 'pending';
   if (e === 'EN PAUSA') return 'blocked';
@@ -687,10 +820,13 @@ function transformAppTuData(issues, fieldNames) {
   const mcItems = digIssues.filter(i => i.fields.issuetype.name === 'Mejora Continua');
   const mcListo = mcItems.filter(i => i.fields.status.statusCategory && i.fields.status.statusCategory.key === 'done').length;
   const mcOut = mcItems.map(it => ({
+    key: it.key,
     desc: (it.fields.summary||'').slice(0,90),
     resp: (it.fields.assignee && it.fields.assignee.displayName) || 'Sin asignar',
     status: badgeEstadoJS(it.fields.status.name, it.fields.status.statusCategory && it.fields.status.statusCategory.name),
-    deadline: fmtDateISO(it.fields[dueFieldId])
+    estadoRaw: it.fields.status.name,
+    deadline: fmtDateISO(it.fields[dueFieldId]),
+    resuelta: fmtDateISO(it.fields[resolvedFieldId])
   }));
 
   // Tarea tipo
