@@ -112,6 +112,9 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
   .mc-list-card { border:1px solid #ece9e0; border-radius:12px; overflow:hidden; }
   .mc-list-row { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; font-size:12.5px; border-top:1px solid #f0efe9; }
   .mc-list-row:first-child { border-top:none; }
+  .mc-filtered-box { margin-top:12px; padding-top:12px; border-top:1px dashed #e2e0d8; }
+  .mc-filtered-title { font-size:11.5px; font-weight:700; color:#5c584f; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
+  .mc-filtered-close { cursor:pointer; color:#a8a297; font-size:13px; }
   .col-headers { display:grid; grid-template-columns:2fr 1.1fr 0.85fr 0.75fr 0.85fr 0.75fr; gap:8px; padding:8px 18px; background:#faf9f5; border-top:1px solid #f0efe9; font-size:10.5px; font-weight:700; color:#a8a297; text-transform:uppercase; letter-spacing:.04em; }
   .item-row { display:grid; grid-template-columns:2fr 1.1fr 0.85fr 0.75fr 0.85fr 0.75fr; gap:8px; align-items:center; padding:9px 18px; border-top:1px solid #f5f4ee; font-size:12.5px; }
   .item-pct { font-weight:800; font-size:12.5px; }
@@ -189,41 +192,31 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
     <div class="bn-card" style="--accent:#a02020"><div class="bn-label">Vencidas sin cerrar</div><div class="bn-num" id="bn-vencidas">0</div><div class="bn-sub">requieren atención</div></div>
   </div>
 
-  <!-- % avance por épica -->
-  <div class="charts-grid">
-    <div class="chart-card">
-      <div class="chart-title">% de avance por proyecto (épica)</div>
-      <div class="chart-sub">Ítems en "Listo" sobre el total de cada proyecto</div>
-      <div id="rank-epicas"></div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-title">Cantidad de tareas por proyecto</div>
-      <div class="chart-sub">% del volumen total de trabajo</div>
-      <div id="rank-volumen"></div>
-    </div>
+  <!-- % avance por épica (unificado) -->
+  <div class="chart-card" style="margin-bottom:1.5rem;">
+    <div class="chart-title">% de avance por proyecto</div>
+    <div class="chart-sub">% de avance del proyecto (finalizado + publicado + implementado + beta) · cantidad de tareas dentro de la barra</div>
+    <div id="rank-epicas"></div>
   </div>
 
-  <!-- Mejora continua + tarea tipo -->
-  <div class="charts-grid-3">
-    <div class="chart-card" style="cursor:pointer;" onclick="toggleMcDetail()">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
-        <div class="chart-title">Mejora Continua</div>
-        <span class="chevron open" id="mc-chevron" style="font-size:11px;color:#a8a297;">▼</span>
-      </div>
-      <div class="chart-sub" id="mc-sub"></div>
-      <div class="donut-row">
+  <!-- Mejora continua -->
+  <div class="chart-card" style="cursor:pointer;margin-bottom:1.5rem;" onclick="toggleMcDetail()">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="chart-title">Mejora Continua</div>
+      <span class="chevron open" id="mc-chevron" style="font-size:11px;color:#a8a297;">▼</span>
+    </div>
+    <div class="chart-sub" id="mc-sub"></div>
+    <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:4px;">
+      <div class="donut-row" onclick="event.stopPropagation()" style="flex-shrink:0;">
         <div class="donut-wrap"><canvas id="donutMC" width="100" height="100"></canvas><div class="donut-center"><div class="donut-pct" id="mc-pct" style="color:#1558a0">0%</div><div class="donut-label">listo</div></div></div>
         <div class="donut-legend" id="mc-legend"></div>
       </div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-title">Tareas (tipo "Tarea")</div>
-      <div class="chart-sub" id="tarea-sub"></div>
-      <div class="donut-row">
-        <div class="donut-wrap"><canvas id="donutTarea" width="100" height="100"></canvas><div class="donut-center"><div class="donut-pct" id="tarea-pct" style="color:#1558a0">0%</div><div class="donut-label">listo</div></div></div>
-        <div class="donut-legend" id="tarea-legend"></div>
+      <div style="flex:1;min-width:180px;border-left:1px solid #f0efe9;padding-left:20px;" onclick="event.stopPropagation()">
+        <div style="font-size:11px;font-weight:700;color:#8a8578;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Top 3 · Publicadas e Implementadas</div>
+        <div id="mc-top3"></div>
       </div>
     </div>
+    <div id="mc-filtered-list" onclick="event.stopPropagation()"></div>
   </div>
 
   <div class="chart-card" id="mc-detail-panel" style="display:none;margin-bottom:1.5rem;">
@@ -401,23 +394,18 @@ function renderBigNumbers() {
 
 function renderRankEpicas() {
   const sorted = [...DATA.epics].sort((a,b)=>b.pct-a.pct);
-  document.getElementById('rank-epicas').innerHTML = sorted.map((e,i)=>`
-    <div class="rank-row">
-      <div class="rank-name" title="${e.name}">${e.name}</div>
-      <div class="rank-track"><div class="rank-fill" style="width:${e.pct}%;background:${rankColors[i%rankColors.length]}"></div></div>
-      <div class="rank-pct">${e.pct}%</div>
-    </div>`).join('');
-}
-
-function renderRankVolumen() {
-  const totalAll = DATA.epics.reduce((s,e)=>s+e.total,0) || 1;
-  const sorted = [...DATA.epics].sort((a,b)=>b.total-a.total);
-  document.getElementById('rank-volumen').innerHTML = sorted.map((e,i)=>{
-    const pct = Math.round(e.total/totalAll*100);
+  document.getElementById('rank-epicas').innerHTML = sorted.map((e,i)=>{
+    const dentro = e.pct >= 12;
+    const numLabel = dentro
+      ? `<span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10px;color:#fff;font-weight:700;">${e.total}</span>`
+      : `<span style="position:absolute;left:calc(${e.pct}% + 6px);top:50%;transform:translateY(-50%);font-size:10px;color:#8a8578;font-weight:700;">${e.total}</span>`;
     return `<div class="rank-row">
       <div class="rank-name" title="${e.name}">${e.name}</div>
-      <div class="rank-track"><div class="rank-fill" style="width:${pct}%;background:${rankColors[i%rankColors.length]}"></div></div>
-      <div class="rank-pct">${e.total}</div>
+      <div class="rank-track" style="position:relative;height:16px;">
+        <div class="rank-fill" style="width:${e.pct}%;background:${rankColors[i%rankColors.length]};height:100%;"></div>
+        ${numLabel}
+      </div>
+      <div class="rank-pct">${e.pct}%</div>
     </div>`;
   }).join('');
 }
@@ -530,23 +518,92 @@ function statusBreakdown(items) {
   return c;
 }
 
+function mcCategoriaBreakdown(items) {
+  const c = {implementadas:0, publicadas:0, beta:0, finalizadas:0, curso:0, pausa:0, porhacer:0, backlog:0};
+  items.forEach(it=>{
+    const e = (it.estadoRaw||'').trim();
+    if (e==='Implementado Prod') c.implementadas++;
+    else if (e==='BETA') c.beta++;
+    else if (e==='Publicado') c.publicadas++;
+    else if (e==='Finalizado') c.finalizadas++;
+    else if (e==='EN PAUSA') c.pausa++;
+    else if (e==='En progreso') c.curso++;
+    else if (e==='Por hacer') c.porhacer++;
+    else if (e==='BACKLOG') c.backlog++;
+    else c.backlog++;
+  });
+  return c;
+}
+
 function renderMejoraContinua() {
   const mc = DATA.mejoraContinua;
-  document.getElementById('mc-sub').textContent = `${mc.listo} de ${mc.total} ítems finalizados`;
-  document.getElementById('mc-pct').textContent = mc.pct + '%';
-  const c = statusBreakdown(mc.items);
-  const data = [c.final, c.progress, c.pending, c.blocked];
-  const colors = ['#2d7a27','#1558a0','#c47a00','#a02020'];
-  const labels = ['Finalizado','En curso','Pendiente','En pausa'];
+  const c = mcCategoriaBreakdown(mc.items);
+  const listoReal = c.implementadas + c.publicadas + c.beta;
+  const pctReal = mc.total ? Math.round(listoReal/mc.total*100) : 0;
+  document.getElementById('mc-sub').textContent = `${listoReal} de ${mc.total} ítems finalizados`;
+  document.getElementById('mc-pct').textContent = pctReal + '%';
+  const data = [c.publicadas, c.implementadas, c.beta, c.finalizadas, c.curso, c.pausa, c.porhacer, c.backlog];
+  const colors = ['#0f9e88','#2d7a27','#8a3ffc','#6b9ce8','#1558a0','#a02020','#c47a00','#948e80'];
+  const labels = ['Publicadas','Implementadas','Beta','Finalizadas (pend. implementación)','En curso','En pausa','Por hacer','Backlog'];
+  const catKeys = ['publicadas','implementadas','beta','finalizadas','curso','pausa','porhacer','backlog'];
   if (donutMC) { donutMC.data.datasets[0].data = data; donutMC.update(); }
   else {
     donutMC = new Chart(document.getElementById('donutMC').getContext('2d'), {
       type:'doughnut', data:{ labels, datasets:[{data,backgroundColor:colors,borderWidth:0}]},
-      options:{cutout:'70%', plugins:{legend:{display:false}}, animation:{duration:300}}
+      options:{
+        cutout:'70%', plugins:{legend:{display:false}}, animation:{duration:300},
+        onClick:(evt, elements)=>{
+          if (!elements.length) return;
+          const idx = elements[0].index;
+          mostrarMcFiltrado(catKeys[idx], labels[idx]);
+        }
+      }
     });
   }
-  document.getElementById('mc-legend').innerHTML = labels.map((l,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${colors[i]}"></div>${l}: ${data[i]}</div>`).join('');
+  document.getElementById('mc-legend').innerHTML = labels.map((l,i)=>`<div class="legend-item" style="cursor:pointer;" onclick="mostrarMcFiltrado('${catKeys[i]}','${l}')"><div class="legend-dot" style="background:${colors[i]}"></div>${l}: ${data[i]}</div>`).join('');
   renderMcDetail();
+
+  const topMap = {};
+  mc.items.forEach(it => {
+    const cat = categoriaDeItem(it);
+    if (cat==='publicadas' || cat==='implementadas') {
+      topMap[it.resp] = (topMap[it.resp]||0) + 1;
+    }
+  });
+  const top3 = Object.entries(topMap).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  document.getElementById('mc-top3').innerHTML = top3.length ? top3.map(([persona,cant])=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-top:1px solid #f0efe9;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="mc-avatar" style="background:#e2f0db;color:#2d7a27;">${iniciales(persona)}</div>
+        <span style="font-size:12.5px;">${persona}</span>
+      </div>
+      <span style="font-size:12.5px;font-weight:700;">${cant}</span>
+    </div>`).join('') : '<div style="font-size:12px;color:#a8a297;">Sin datos todavía.</div>';
+}
+
+function categoriaDeItem(it) {
+  const e = (it.estadoRaw||'').trim();
+  if (e==='Publicado') return 'publicadas';
+  if (e==='Implementado Prod') return 'implementadas';
+  if (e==='BETA') return 'beta';
+  if (e==='Finalizado') return 'finalizadas';
+  if (e==='En progreso') return 'curso';
+  if (e==='EN PAUSA') return 'pausa';
+  if (e==='Por hacer') return 'porhacer';
+  return 'backlog';
+}
+
+function mostrarMcFiltrado(catKey, label) {
+  const items = (DATA.mejoraContinua.items||[]).filter(it => categoriaDeItem(it)===catKey);
+  const box = document.getElementById('mc-filtered-list');
+  box.innerHTML = `
+    <div class="mc-filtered-box">
+      <div class="mc-filtered-title"><span>${label} (${items.length})</span><span class="mc-filtered-close" onclick="document.getElementById('mc-filtered-list').innerHTML=''">✕ cerrar</span></div>
+      ${items.length ? items.map(it=>`
+        <div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;">
+          <span>${it.desc}</span><span class="text-muted">${it.resp}</span>
+        </div>`).join('') : '<div style="font-size:12px;color:#a8a297;">Sin ítems en esta categoría.</div>'}
+    </div>`;
 }
 
 function toggleMcDetail() {
@@ -637,26 +694,6 @@ function renderMcDetail() {
   renderRankPersona('mc-rank-curso', cursoPorPersona, '#1558a0');
 }
 
-function renderTareaTipo() {
-  const t = DATA.tareaTipo;
-  document.getElementById('tarea-sub').textContent = `${t.listo} de ${t.total} tareas finalizadas`;
-  document.getElementById('tarea-pct').textContent = t.pct + '%';
-  const allTareaItems = [];
-  DATA.epics.forEach(e=>e.items.forEach(it=>{ if(it.tipo==='Tarea') allTareaItems.push(it); }));
-  const c = statusBreakdown(allTareaItems);
-  const data = [c.final, c.progress, c.pending, c.blocked];
-  const colors = ['#2d7a27','#1558a0','#c47a00','#a02020'];
-  const labels = ['Finalizado','En curso','Pendiente','En pausa'];
-  if (donutTarea) { donutTarea.data.datasets[0].data = data; donutTarea.update(); }
-  else {
-    donutTarea = new Chart(document.getElementById('donutTarea').getContext('2d'), {
-      type:'doughnut', data:{ labels, datasets:[{data,backgroundColor:colors,borderWidth:0}]},
-      options:{cutout:'70%', plugins:{legend:{display:false}}, animation:{duration:300}}
-    });
-  }
-  document.getElementById('tarea-legend').innerHTML = labels.map((l,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${colors[i]}"></div>${l}: ${data[i]}</div>`).join('');
-}
-
 function toggleProject(id) {
   const b=document.getElementById('body-'+id), c=document.getElementById('chev-'+id);
   const open=b.classList.contains('open');
@@ -716,10 +753,8 @@ document.getElementById('dashdate').textContent = new Date().toLocaleDateString(
 populateDropdowns();
 renderBigNumbers();
 renderRankEpicas();
-renderRankVolumen();
 renderRankCarga();
 renderMejoraContinua();
-renderTareaTipo();
 render();
 
 // ══════════════════════════════════════════════
@@ -824,7 +859,16 @@ function transformAppTuData(issues, fieldNames) {
   });
 
   // Mejora Continua (por tipo, en todo el proyecto DIG)
-  const mcItems = digIssues.filter(i => i.fields.issuetype.name === 'Mejora Continua');
+  const epicaMejoraContinuaKey = Object.keys(byKey).find(k => byKey[k].fields.issuetype && byKey[k].fields.issuetype.name==='Epic' && (byKey[k].fields.summary||'').trim()==='Mejora Continua');
+  const mcItemsPorTipo = digIssues.filter(i => i.fields.issuetype.name === 'Mejora Continua');
+  const mcItemsPorEpica = epicaMejoraContinuaKey
+    ? digIssues.filter(i => i.fields.issuetype.name!=='Epic' && resolveEpic(i)===epicaMejoraContinuaKey)
+    : [];
+  const mcSeen = new Set();
+  const mcItems = [...mcItemsPorTipo, ...mcItemsPorEpica].filter(i => {
+    if (mcSeen.has(i.key)) return false;
+    mcSeen.add(i.key); return true;
+  });
   const mcListo = mcItems.filter(i => i.fields.status.statusCategory && i.fields.status.statusCategory.key === 'done').length;
   const mcOut = mcItems.map(it => ({
     key: it.key,
@@ -961,8 +1005,8 @@ async function syncFromJira() {
     document.getElementById('f-epica').innerHTML = '<option value="all">Todos</option>';
     document.getElementById('f-persona').innerHTML = '<option value="all">Todas</option>';
     populateDropdowns();
-    renderBigNumbers(); renderRankEpicas(); renderRankVolumen(); renderRankCarga();
-    renderMejoraContinua(); renderTareaTipo(); render();
+    renderBigNumbers(); renderRankEpicas(); renderRankCarga();
+    renderMejoraContinua(); render();
     setSyncStatus('✅ Sincronizado con Jira — ' + new Date().toLocaleTimeString('es-PY') + ` (${json.total} tickets de DIG+UXUI recibidos)`, 'ok');
   } catch (e) {
     setSyncStatus('⚠️ Error de conexión: ' + e.message, 'error');
