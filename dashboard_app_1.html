@@ -242,14 +242,6 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
       <div class="mc-ministat"><div class="mc-ministat-label">No iniciadas</div><div class="mc-ministat-num" id="mc-stat-noini" style="color:#c47a00;">0</div></div>
     </div>
 
-    <div class="chart-title" style="margin:20px 0 10px; display:flex; align-items:center; gap:8px;">⏱️ En progreso / En pausa</div>
-    <div id="mc-detail-enprogreso" class="mc-list-card"></div>
-
-    <div class="chart-title" style="margin:20px 0 10px; display:flex; align-items:center; gap:8px;">📊 Ranking por persona — Fin vs. en curso</div>
-    <div style="font-size:11.5px;font-weight:700;color:#2d7a27;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">Finalizadas / Publicadas</div>
-    <div id="mc-rank-fin" style="margin-bottom:16px;"></div>
-    <div style="font-size:11.5px;font-weight:700;color:#1558a0;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">En curso / En pausa / Por hacer</div>
-    <div id="mc-rank-curso"></div>
   </div>
 
   <!-- Carga de trabajo -->
@@ -270,7 +262,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
     <div style="border-top:1px dashed #e2e0d8;margin-top:16px;padding-top:14px;">
       <div class="chart-title" style="margin-bottom:2px;">Entregado por persona — por mes</div>
-      <div class="chart-sub" style="margin-bottom:10px;">Publicado + implementado + beta + finalizado, según fecha de resolución</div>
+      <div class="chart-sub" style="margin-bottom:10px;">Solo Publicado + Implementado Prod, según fecha de resolución</div>
       <div id="carga-mes-btns" style="display:flex;gap:6px;margin-bottom:12px;"></div>
       <div id="carga-mes-list"></div>
     </div>
@@ -715,34 +707,6 @@ function renderMcDetail() {
   document.getElementById('mc-stat-curso').textContent = enProgresoPausa.length;
   document.getElementById('mc-stat-noini').textContent = noIniciadas;
 
-  document.getElementById('mc-detail-enprogreso').innerHTML = enProgresoPausa.length ? enProgresoPausa.map(it=>`
-    <div class="mc-list-row">
-      <span>${it.desc}</span>
-      <div class="mc-person">
-        <span class="badge ${it.estadoRaw==='EN PAUSA'?'b-blocked':'b-progress'}">${it.estadoRaw==='EN PAUSA'?'En pausa':'En curso'}</span>
-        <div class="mc-avatar pro">${iniciales(it.resp)}</div>
-      </div>
-    </div>`).join('') : '<div style="font-size:12px;color:#a8a297;padding:10px 14px;">Ninguna en curso o en pausa.</div>';
-
-  const finItems = items.filter(it => it.status === 'final');
-  const cursoItems = items.filter(it => it.status !== 'final');
-  const finPorPersona = {};
-  finItems.forEach(it => { finPorPersona[it.resp] = (finPorPersona[it.resp]||0)+1; });
-  const cursoPorPersona = {};
-  cursoItems.forEach(it => { cursoPorPersona[it.resp] = (cursoPorPersona[it.resp]||0)+1; });
-
-  function renderRankPersona(elId, map, color) {
-    const arr = Object.entries(map).sort((a,b)=>b[1]-a[1]);
-    const max = arr[0]?.[1] || 1;
-    document.getElementById(elId).innerHTML = arr.length ? arr.map(([persona,cant])=>`
-      <div class="rank-row">
-        <div class="rank-name" title="${persona}">${persona}</div>
-        <div class="rank-track"><div class="rank-fill" style="width:${Math.round(cant/max*100)}%;background:${color}"></div></div>
-        <div class="rank-pct">${cant}</div>
-      </div>`).join('') : '<div style="font-size:12px;color:#a8a297;">Sin datos.</div>';
-  }
-  renderRankPersona('mc-rank-fin', finPorPersona, '#2d7a27');
-  renderRankPersona('mc-rank-curso', cursoPorPersona, '#1558a0');
 }
 
 function toggleProject(id) {
@@ -978,11 +942,14 @@ function transformAppTuData(issues, fieldNames) {
       const st = badgeEstadoJS(i.fields.status.name, i.fields.status.statusCategory && i.fields.status.statusCategory.name);
       if (st === 'final') {
         cargaEntregadoMap[resp] = (cargaEntregadoMap[resp]||0) + 1;
-        const resFecha = i.fields[resolvedFieldId] ? new Date(i.fields[resolvedFieldId]) : null;
-        if (resFecha) {
-          const mesNombre = MESES_ORDEN_CARGA[resFecha.getMonth()];
-          cargaMesMap[mesNombre] = cargaMesMap[mesNombre] || {};
-          cargaMesMap[mesNombre][resp] = (cargaMesMap[mesNombre][resp]||0) + 1;
+        // "Entregado por persona — por mes" cuenta solo Publicado e Implementado Prod (no Beta ni Finalizado)
+        if (['Publicado','Implementado Prod'].includes(i.fields.status.name)) {
+          const resFecha = i.fields[resolvedFieldId] ? new Date(i.fields[resolvedFieldId]) : null;
+          if (resFecha) {
+            const mesNombre = MESES_ORDEN_CARGA[resFecha.getMonth()];
+            cargaMesMap[mesNombre] = cargaMesMap[mesNombre] || {};
+            cargaMesMap[mesNombre][resp] = (cargaMesMap[mesNombre][resp]||0) + 1;
+          }
         }
       } else if (st === 'progress' || st === 'blocked') {
         cargaEnCursoMap[resp] = (cargaEnCursoMap[resp]||0) + 1;
