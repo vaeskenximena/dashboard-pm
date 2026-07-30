@@ -10,6 +10,22 @@
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY; // ⚠️ Configurar en Netlify, nunca en el código
 
+// Busca en el historial de cambios (changelog) la fecha del PRIMER cambio de estado a "En progreso".
+// Devuelve un string ISO o null si el ticket nunca pasó por ese estado.
+function extraerProgresoDesde(issue) {
+  if (!issue.changelog || !Array.isArray(issue.changelog.histories)) return null;
+  let earliest = null;
+  issue.changelog.histories.forEach(h => {
+    (h.items || []).forEach(item => {
+      if (item.field === 'status' && item.toString === 'En progreso') {
+        const d = new Date(h.created);
+        if (!isNaN(d) && (!earliest || d < earliest)) earliest = d;
+      }
+    });
+  });
+  return earliest ? earliest.toISOString() : null;
+}
+
 exports.handler = async function (event) {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -80,12 +96,14 @@ exports.handler = async function (event) {
     const fieldsToRequest = [...baseFields, ...neededCustomIds];
 
     // 3b. Buscar los issues, pidiendo solo los campos necesarios (no *all) para no exceder el límite de tamaño de Netlify
+    // Se agrega expand: ["changelog"] para poder calcular __progresoDesde (fecha en que cada ticket entró a "En progreso").
     while (allIssues.length < 2000) {
       const jiraUrl = `https://${config.dominio}/rest/api/3/search/jql`;
       const body = {
         jql,
         maxResults: 100,
-        fields: fieldsToRequest
+        fields: fieldsToRequest,
+        expand: ['changelog']
       };
       if (nextPageToken) body.nextPageToken = nextPageToken;
 
@@ -104,7 +122,15 @@ exports.handler = async function (event) {
       }
 
       const data = await jiraResp.json();
-      allIssues = allIssues.concat(data.issues || []);
+      const issuesPage = data.issues || [];
+
+      // Extraemos la fecha de "En progreso" del changelog y lo descartamos (pesa mucho y no lo necesitamos completo)
+      issuesPage.forEach(issue => {
+        issue.fields.__progresoDesde = extraerProgresoDesde(issue);
+        delete issue.changelog;
+      });
+
+      allIssues = allIssues.concat(issuesPage);
 
       if (data.isLast || !data.issues || data.issues.length === 0 || !data.nextPageToken) break;
       nextPageToken = data.nextPageToken;
