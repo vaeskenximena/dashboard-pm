@@ -112,6 +112,14 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
   .mc-list-card { border:1px solid #ece9e0; border-radius:12px; overflow:hidden; }
   .mc-list-row { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; font-size:12.5px; border-top:1px solid #f0efe9; }
   .mc-list-row:first-child { border-top:none; }
+
+  .perf-risk-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .perf-risk-card { background:#faf9f5; border-radius:10px; padding:12px 14px; border-left:3px solid #ccc; }
+  .perf-risk-label { font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; margin-bottom:6px; }
+  .perf-2col { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+  .perf-section-label { font-size:11px; font-weight:700; color:#8a8578; text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px; }
+  .perf-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-top:1px solid #f0efe9; font-size:12.5px; }
+  .perf-row:first-child { border-top:none; }
   .mc-filtered-box { margin-top:12px; padding-top:12px; border-top:1px dashed #e2e0d8; }
   .mc-filtered-title { font-size:11.5px; font-weight:700; color:#5c584f; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
   .mc-filtered-close { cursor:pointer; color:#a8a297; font-size:13px; }
@@ -124,6 +132,9 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
   .badge { display:inline-block; padding:3px 9px; border-radius:999px; font-size:10.5px; font-weight:700; white-space:nowrap; }
   .b-final{background:#d4f0e6;color:#0a5e42;} .b-progress{background:#ddeaf8;color:#1053a0;}
   .b-pending{background:#fdefd4;color:#7a4800;} .b-blocked{background:#fde4e4;color:#941818;}
+  .b-publicado{background:#d0f0ea;color:#0f7a68;} .b-implementado{background:#d4f0e6;color:#0a5e42;}
+  .b-beta{background:#f2ebff;color:#6b2fd0;} .b-finalizadoreal{background:#e2ecfa;color:#1a4d8f;}
+  .b-backlog{background:#eeece5;color:#5c584f;}
   .text-muted{color:#948e80;}
   .macro-section { padding:12px 18px 4px; border-top:1px solid #f0efe9; }
   .macro-title { font-size:10.5px; font-weight:700; color:#a8a297; text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px; }
@@ -135,6 +146,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
   .macro-name { font-size:12.5px; color:#3a3a38; flex:1; }
   .macro-name.done { text-decoration:line-through; color:#a8a297; }
   .macro-pct { font-size:11.5px; font-weight:800; width:38px; text-align:right; flex-shrink:0; }
+  .macro-resp { font-size:11.5px; color:#8a8578; width:130px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .tipo-tag { font-size:10.5px; color:#a8a297; font-weight:600; }
 
   .btn-perf { padding:8px 14px; border-radius:8px; border:1px solid #1558a0; background:#eaf1fa; color:#1558a0; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; flex-shrink:0; white-space:nowrap; transition:background .15s; }
@@ -217,6 +229,10 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
       </div>
     </div>
     <div id="mc-filtered-list" onclick="event.stopPropagation()"></div>
+    <div style="border-top:1px solid #f0efe9;margin-top:16px;padding-top:16px;" onclick="event.stopPropagation()">
+      <div class="chart-title" style="margin-bottom:10px;">Publicadas e implementadas por mes</div>
+      <div class="chart-box" style="height:160px;"><canvas id="mcMesChart"></canvas></div>
+    </div>
   </div>
 
   <div class="chart-card" id="mc-detail-panel" style="display:none;margin-bottom:1.5rem;">
@@ -244,14 +260,23 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div>
         <div class="chart-title">Carga de trabajo por persona</div>
-        <div class="chart-sub">Dividido por estado — Finalizadas/Publicadas vs. En curso/Pausa/Por hacer</div>
+        <div class="chart-sub">Composición: entregado · en curso · sin iniciar</div>
       </div>
       <button class="btn-perf" onclick="openPerfModal()">📊 Performance equipo</button>
     </div>
-    <div style="font-size:11.5px;font-weight:700;color:#2d7a27;text-transform:uppercase;letter-spacing:.04em;margin:14px 0 8px;">Finalizadas / Publicadas</div>
-    <div id="rank-carga-fin" style="margin-bottom:16px;"></div>
-    <div style="font-size:11.5px;font-weight:700;color:#1558a0;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">En curso / En pausa / Por hacer</div>
-    <div id="rank-carga-curso"></div>
+    <div style="display:flex;gap:14px;margin:12px 0 14px;font-size:11px;color:#8a8578;">
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#2d7a27;margin-right:4px;"></span>Entregado</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#1558a0;margin-right:4px;"></span>En curso</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#d8d5cb;margin-right:4px;"></span>Sin iniciar</span>
+    </div>
+    <div id="carga-stack"></div>
+
+    <div style="border-top:1px dashed #e2e0d8;margin-top:16px;padding-top:14px;">
+      <div class="chart-title" style="margin-bottom:2px;">Entregado por persona — por mes</div>
+      <div class="chart-sub" style="margin-bottom:10px;">Publicado + implementado + beta + finalizado, según fecha de resolución</div>
+      <div id="carga-mes-btns" style="display:flex;gap:6px;margin-bottom:12px;"></div>
+      <div id="carga-mes-list"></div>
+    </div>
   </div>
 
   <!-- Modal Performance Equipo -->
@@ -265,36 +290,47 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
         <button class="modal-close" onclick="closePerfModal()">✕</button>
       </div>
       <div class="modal-body">
-        <div class="bignums" style="margin-bottom:1.25rem;">
+        <div class="bignums" style="margin-bottom:1.1rem;">
           <div class="bn-card" style="--accent:#1558a0"><div class="bn-label">Tareas globales</div><div class="bn-num" id="perf-total">0</div><div class="bn-sub">todos los tipos</div></div>
           <div class="bn-card" style="--accent:#a02020"><div class="bn-label">Vencidas sin cerrar</div><div class="bn-num" id="perf-vencidas">0</div><div class="bn-sub" id="perf-vencidas-sub"></div></div>
           <div class="bn-card" style="--accent:#2d7a27"><div class="bn-label">Top cumplimiento</div><div class="bn-num" id="perf-top" style="font-size:16px;">—</div><div class="bn-sub" id="perf-top-sub"></div></div>
         </div>
 
-        <div class="chart-card" style="margin-bottom:14px;">
-          <div class="chart-title">% de cumplimiento a tiempo por persona</div>
-          <div class="chart-sub">Tareas finalizadas antes o en la fecha de vencimiento, sobre el total con fecha comparable</div>
-          <div id="perf-cumplimiento"></div>
+        <div class="perf-risk-grid" style="margin-bottom:1.1rem;">
+          <div class="perf-risk-card" style="border-left-color:#a02020;">
+            <div class="perf-risk-label" style="color:#a02020;">⚠️ Doble riesgo</div>
+            <div id="perf-doble-riesgo"></div>
+          </div>
+          <div class="perf-risk-card" style="border-left-color:#c47a00;">
+            <div class="perf-risk-label" style="color:#c47a00;">🚫 Sin asignar</div>
+            <div id="perf-sin-tareas"></div>
+          </div>
         </div>
 
-        <div class="charts-grid-3" style="margin-bottom:14px;">
-          <div class="chart-card">
-            <div class="chart-title">Tareas vencidas por persona</div>
-            <div class="chart-sub">Sin cerrar, con fecha ya pasada</div>
+        <div class="perf-2col" style="margin-bottom:1.1rem;">
+          <div>
+            <div class="perf-section-label">% cumplimiento a tiempo</div>
+            <div id="perf-cumplimiento"></div>
+          </div>
+          <div>
+            <div class="perf-section-label">Tiempo prom. resolución</div>
+            <div id="perf-tiempo-res"></div>
+          </div>
+        </div>
+
+        <div class="perf-2col" style="margin-bottom:1.1rem;">
+          <div>
+            <div class="perf-section-label" style="color:#a02020;">Vencidas por persona</div>
             <div id="perf-vencidas-persona"></div>
           </div>
-          <div class="chart-card">
-            <div class="chart-title">Carga simultánea (WIP)</div>
-            <div class="chart-sub">Tareas "En curso" al mismo tiempo</div>
+          <div>
+            <div class="perf-section-label" style="color:#1558a0;">WIP (en curso)</div>
             <div id="perf-wip"></div>
           </div>
         </div>
 
-        <div class="chart-card">
-          <div class="chart-title">🚫 Sin tareas asignadas</div>
-          <div class="chart-sub">Cruzando tu nómina contra quién tiene algo asignado hoy en Jira</div>
-          <div id="perf-sin-tareas"></div>
-        </div>
+        <div class="perf-section-label">Ítems en pausa — antigüedad</div>
+        <div id="perf-pausados"></div>
       </div>
     </div>
   </div>
@@ -395,10 +431,9 @@ function renderBigNumbers() {
 function renderRankEpicas() {
   const sorted = [...DATA.epics].sort((a,b)=>b.pct-a.pct);
   document.getElementById('rank-epicas').innerHTML = sorted.map((e,i)=>{
-    const dentro = e.pct >= 12;
-    const numLabel = dentro
-      ? `<span style="position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10px;color:#fff;font-weight:700;">${e.total}</span>`
-      : `<span style="position:absolute;left:calc(${e.pct}% + 6px);top:50%;transform:translateY(-50%);font-size:10px;color:#8a8578;font-weight:700;">${e.total}</span>`;
+    const numLabel = e.pct > 0
+      ? `<span style="position:absolute;left:6px;top:50%;transform:translateY(-50%);font-size:10px;color:#fff;font-weight:700;">${e.total}</span>`
+      : `<span style="position:absolute;left:6px;top:50%;transform:translateY(-50%);font-size:10px;color:#8a8578;font-weight:700;">${e.total}</span>`;
     return `<div class="rank-row">
       <div class="rank-name" title="${e.name}">${e.name}</div>
       <div class="rank-track" style="position:relative;height:16px;">
@@ -410,20 +445,53 @@ function renderRankEpicas() {
   }).join('');
 }
 
+let cargaMesActual = null;
+
 function renderRankCarga() {
-  function pintar(elId, lista, color) {
-    const max = lista[0]?.cantidad || 1;
-    document.getElementById(elId).innerHTML = lista.length ? lista.map(c=>{
-      const pct = Math.round(c.cantidad/max*100);
-      return `<div class="rank-row">
-        <div class="rank-name" title="${c.persona}">${c.persona}</div>
-        <div class="rank-track"><div class="rank-fill" style="width:${pct}%;background:${color}"></div></div>
-        <div class="rank-pct">${c.cantidad}</div>
-      </div>`;
-    }).join('') : '<div style="font-size:12px;color:#a8a297;">Sin datos.</div>';
-  }
-  pintar('rank-carga-fin', DATA.cargaFin || [], '#2d7a27');
-  pintar('rank-carga-curso', DATA.cargaCurso || [], '#1558a0');
+  const comp = DATA.cargaComposicion || [];
+  const maxTotal = comp[0]?.total || 1;
+  document.getElementById('carga-stack').innerHTML = comp.length ? comp.map(c=>{
+    const wEnt = c.total ? Math.round(c.entregado/c.total*100) : 0;
+    const wCur = c.total ? Math.round(c.curso/c.total*100) : 0;
+    const wSin = 100 - wEnt - wCur;
+    const barWidth = Math.round(c.total/maxTotal*100);
+    return `<div class="rank-row">
+      <div class="rank-name" title="${c.persona}">${c.persona}</div>
+      <div style="flex:1;display:flex;height:16px;border-radius:6px;overflow:hidden;width:${barWidth}%;">
+        ${c.entregado?`<div style="width:${wEnt}%;background:#2d7a27;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:700;">${c.entregado}</div>`:''}
+        ${c.curso?`<div style="width:${wCur}%;background:#1558a0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:700;">${c.curso}</div>`:''}
+        ${c.sinIniciar?`<div style="width:${wSin}%;background:#d8d5cb;display:flex;align-items:center;justify-content:center;font-size:10px;color:#6b6860;font-weight:700;">${c.sinIniciar}</div>`:''}
+      </div>
+      <div class="rank-pct">${c.total}</div>
+    </div>`;
+  }).join('') : '<div style="font-size:12px;color:#a8a297;">Sin datos.</div>';
+
+  const meses = Object.keys(DATA.cargaPorMes || {});
+  const ordenMeses = ['Diciembre','Noviembre','Octubre','Septiembre','Agosto','Julio','Junio','Mayo','Abril','Marzo','Febrero','Enero'];
+  const mesesOrdenados = ordenMeses.filter(m=>meses.includes(m));
+  if (!cargaMesActual || !mesesOrdenados.includes(cargaMesActual)) cargaMesActual = mesesOrdenados[0] || null;
+
+  document.getElementById('carga-mes-btns').innerHTML = mesesOrdenados.map(m=>
+    `<button class="scope-btn ${m===cargaMesActual?'active':''}" onclick="setCargaMes('${m}')" style="padding:5px 14px;border-radius:20px;border:1px solid ${m===cargaMesActual?'#1558a0':'#e2e0d8'};background:${m===cargaMesActual?'#1558a0':'#fff'};color:${m===cargaMesActual?'#fff':'#5c584f'};font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;">${m}</button>`
+  ).join('');
+
+  renderCargaMesList();
+}
+
+function setCargaMes(mes) {
+  cargaMesActual = mes;
+  renderRankCarga();
+}
+
+function renderCargaMesList() {
+  const lista = (DATA.cargaPorMes && DATA.cargaPorMes[cargaMesActual]) || [];
+  const max = lista[0]?.cantidad || 1;
+  document.getElementById('carga-mes-list').innerHTML = lista.length ? lista.map(c=>`
+    <div class="rank-row">
+      <div class="rank-name" title="${c.persona}">${c.persona}</div>
+      <div class="rank-track"><div class="rank-fill" style="width:${Math.round(c.cantidad/max*100)}%;background:#2d7a27"></div></div>
+      <div class="rank-pct">${c.cantidad}</div>
+    </div>`).join('') : '<div style="font-size:12px;color:#a8a297;">Nadie entregó nada este mes.</div>';
 }
 
 const EQUIPO_APP_TU = [
@@ -442,6 +510,11 @@ function openPerfModal() {
   document.getElementById('perf-vencidas').textContent = p.vencidasGlobal;
   document.getElementById('perf-vencidas-sub').textContent = `de las cuales ${p.vencidasAltaPrioridad} son de prioridad Alta/Urgente`;
 
+  // Doble riesgo
+  document.getElementById('perf-doble-riesgo').innerHTML = (p.dobleRiesgo||[]).length ? p.dobleRiesgo.map(d=>`
+    <div style="font-size:12.5px;padding:3px 0;">${d.persona} <span style="color:#8a8578;">— ${d.vencidas} venc. · ${d.wip} WIP</span></div>
+  `).join('') : '<div style="font-size:12px;color:#8a8578;">Nadie combina vencidas + WIP alto ahora mismo.</div>';
+
   const MIN_MUESTRA = 3;
   const elegibles = p.cumplimiento.filter(c=>c.total>=MIN_MUESTRA);
   if (elegibles.length) {
@@ -453,34 +526,27 @@ function openPerfModal() {
     document.getElementById('perf-top-sub').textContent = 'sin datos suficientes';
   }
 
-  document.getElementById('perf-cumplimiento').innerHTML = p.cumplimiento.map((c,i)=>{
+  document.getElementById('perf-cumplimiento').innerHTML = p.cumplimiento.map(c=>{
     const color = c.pct>=70 ? '#2d7a27' : c.pct>=40 ? '#c47a00' : '#a02020';
-    return `<div class="rank-row">
-      <div class="rank-name" title="${c.persona}">${c.persona}</div>
-      <div class="rank-track"><div class="rank-fill" style="width:${c.pct}%;background:${color}"></div></div>
-      <div class="rank-pct">${c.pct}%</div>
-    </div><div style="font-size:10.5px;color:#a8a297;margin:-4px 0 8px 160px;">${c.aTiempo}/${c.total} a tiempo</div>`;
+    return `<div class="perf-row"><span>${c.persona}</span><span style="color:${color};font-weight:700;">${c.pct}%</span></div>`;
   }).join('');
 
-  const maxVenc = p.vencidasPorPersona[0]?.cantidad || 1;
-  document.getElementById('perf-vencidas-persona').innerHTML = p.vencidasPorPersona.length ? p.vencidasPorPersona.map((v,i)=>{
-    const pct = Math.round(v.cantidad/maxVenc*100);
-    return `<div class="rank-row">
-      <div class="rank-name" title="${v.persona}">${v.persona}</div>
-      <div class="rank-track"><div class="rank-fill" style="width:${pct}%;background:#a02020"></div></div>
-      <div class="rank-pct">${v.cantidad}</div>
-    </div>`;
-  }).join('') : '<div style="font-size:12px;color:#a8a297;">Nadie tiene tareas vencidas — 🎉</div>';
+  document.getElementById('perf-tiempo-res').innerHTML = (p.tiempoResolucion||[]).length ? p.tiempoResolucion.map(t=>`
+    <div class="perf-row"><span>${t.persona}</span><span style="font-weight:700;">${t.dias} d</span></div>
+  `).join('') : '<div style="font-size:12px;color:#8a8578;">Sin datos suficientes.</div>';
 
-  const maxWip = p.wip[0]?.cantidad || 1;
-  document.getElementById('perf-wip').innerHTML = p.wip.map((w,i)=>{
-    const pct = Math.round(w.cantidad/maxWip*100);
-    return `<div class="rank-row">
-      <div class="rank-name" title="${w.persona}">${w.persona}</div>
-      <div class="rank-track"><div class="rank-fill" style="width:${pct}%;background:#1558a0"></div></div>
-      <div class="rank-pct">${w.cantidad}</div>
-    </div>`;
-  }).join('');
+  document.getElementById('perf-vencidas-persona').innerHTML = p.vencidasPorPersona.length ? p.vencidasPorPersona.map(v=>`
+    <div class="perf-row"><span>${v.persona}</span><span style="color:#a02020;font-weight:700;">${v.cantidad}</span></div>
+  `).join('') : '<div style="font-size:12px;color:#a8a297;">Nadie tiene tareas vencidas — 🎉</div>';
+
+  document.getElementById('perf-wip').innerHTML = p.wip.map(w=>`
+    <div class="perf-row"><span>${w.persona}</span><span style="color:#1558a0;font-weight:700;">${w.cantidad}</span></div>
+  `).join('');
+
+  document.getElementById('perf-pausados').innerHTML = (p.pausados||[]).length ? p.pausados.map(x=>{
+    const color = x.dias>=30 ? '#941818' : x.dias>=14 ? '#c47a00' : '#8a8578';
+    return `<div class="perf-row"><span>${x.desc}</span><span style="color:${color};font-weight:700;">${x.dias} días</span></div>`;
+  }).join('') : '<div style="font-size:12px;color:#8a8578;">Nada en pausa ahora mismo.</div>';
 
   const asignadosNorm = (p.todosAsignados||[]).map(a => normalizaNombre(a).split(/\s+/).filter(w=>w.length>1));
   const sinTareas = [];
@@ -511,7 +577,7 @@ function closePerfModal() {
   document.getElementById('perf-modal-overlay').classList.remove('open');
 }
 
-let donutMC=null, donutTarea=null;
+let donutMC=null, donutTarea=null, mcMesChartInstance=null;
 function statusBreakdown(items) {
   const c = {final:0, progress:0, pending:0, blocked:0};
   items.forEach(it=>{ if(c[it.status]!==undefined) c[it.status]++; });
@@ -579,6 +645,27 @@ function renderMejoraContinua() {
       </div>
       <span style="font-size:12.5px;font-weight:700;">${cant}</span>
     </div>`).join('') : '<div style="font-size:12px;color:#a8a297;">Sin datos todavía.</div>';
+
+  const mesesOrden = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const mesIdx = {};
+  mc.items.forEach(it => {
+    const cat = categoriaDeItem(it);
+    if ((cat==='publicadas' || cat==='implementadas') && it.resuelta) {
+      const partes = it.resuelta.split('/');
+      if (partes.length===3) {
+        const mNum = parseInt(partes[1],10);
+        const key = mesesOrden[mNum-1];
+        if (key) mesIdx[key] = (mesIdx[key]||0) + 1;
+      }
+    }
+  });
+  const mesesConDatos = mesesOrden.filter(m => mesIdx[m] !== undefined);
+  if (mcMesChartInstance) mcMesChartInstance.destroy();
+  mcMesChartInstance = new Chart(document.getElementById('mcMesChart').getContext('2d'), {
+    type:'bar',
+    data:{ labels: mesesConDatos, datasets:[{ data: mesesConDatos.map(m=>mesIdx[m]), backgroundColor:'#2d7a27', borderRadius:8, maxBarThickness:60 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true,ticks:{precision:0},grid:{display:false}}, x:{grid:{display:false}} } }
+  });
 }
 
 function categoriaDeItem(it) {
@@ -708,6 +795,18 @@ function orderedEpics() {
   });
 }
 
+function badgeGranular(estadoRaw) {
+  const e = (estadoRaw||'').trim();
+  if (e==='Publicado') return {label:'Publicado', cls:'b-publicado'};
+  if (e==='Implementado Prod') return {label:'Implementado', cls:'b-implementado'};
+  if (e==='BETA') return {label:'Beta', cls:'b-beta'};
+  if (e==='Finalizado') return {label:'Finalizado', cls:'b-finalizadoreal'};
+  if (e==='En progreso') return {label:'En curso', cls:'b-progress'};
+  if (e==='EN PAUSA') return {label:'En pausa', cls:'b-blocked'};
+  if (e==='Por hacer') return {label:'Por hacer', cls:'b-pending'};
+  return {label:'Backlog', cls:'b-backlog'};
+}
+
 function render() {
   const container = document.getElementById('projects-container');
   container.innerHTML = '';
@@ -722,14 +821,17 @@ function render() {
     const macroHtml = macroTasks.length ? `
       <div class="macro-section">
         <div class="macro-title">Tareas macro del proyecto</div>
-        ${macroTasks.map(it=>`
+        ${macroTasks.map(it=>{
+          const b = badgeGranular(it.estadoRaw);
+          return `
           <div class="macro-row">
             <div class="macro-check ${it.status==='final'?'done':''}">${it.status==='final'?'✓':''}</div>
             <div class="macro-key">${it.key}</div>
             <div class="macro-name ${it.status==='final'?'done':''}">${it.desc}</div>
-            <span class="badge ${statusMap[it.status].cls}">${statusMap[it.status].label}</span>
-            <div class="macro-pct" style="color:${it.pct===100?'#2d7a27':it.pct===0?'#a8a297':'#1558a0'}">${it.pct}%</div>
-          </div>`).join('')}
+            <div class="macro-resp" title="${it.resp}">${it.resp}</div>
+            <span class="badge ${b.cls}">${b.label}</span>
+          </div>`;
+        }).join('')}
       </div>` : `<div class="macro-section"><div class="macro-title">Tareas macro del proyecto</div><div style="font-size:12px;color:#a8a297;padding:6px 0;">Todavía no hay tareas macro cargadas en Jira para este proyecto.</div></div>`;
     const card = document.createElement('div'); card.className='project-card';
     card.innerHTML = `
@@ -842,6 +944,7 @@ function transformAppTuData(issues, fieldNames) {
         estadoRaw: it.fields.status.name,
         pct: STATUS_PCT_JS[st],
         deadline: fmtDateISO(it.fields[dueFieldId]),
+        resuelta: fmtDateISO(it.fields[resolvedFieldId]),
         inicio: fmtDateISO(inicioRaw),
         inicioSort: sortKeyISO(inicioRaw),
         tipo: it.fields.issuetype.name,
@@ -900,24 +1003,41 @@ function transformAppTuData(issues, fieldNames) {
     }
   });
 
-  // Carga de trabajo por persona
-  const cargaMap = {};
-  const cargaFinMap = {};
-  const cargaCursoMap = {};
+  // Carga de trabajo por persona (3 categorías: entregado / en curso / sin iniciar)
+  const MESES_ORDEN_CARGA = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const cargaEntregadoMap = {}, cargaEnCursoMap = {}, cargaSinIniciarMap = {};
+  const cargaMesMap = {}; // { 'Mayo': { persona: cantidad } }
   digIssues.forEach(i => {
     if (leafTypes.includes(i.fields.issuetype.name)) {
       const resp = i.fields.assignee && i.fields.assignee.displayName;
-      if (resp) {
-        cargaMap[resp] = (cargaMap[resp]||0) + 1;
-        const st = badgeEstadoJS(i.fields.status.name, i.fields.status.statusCategory && i.fields.status.statusCategory.name);
-        if (st === 'final') cargaFinMap[resp] = (cargaFinMap[resp]||0) + 1;
-        else cargaCursoMap[resp] = (cargaCursoMap[resp]||0) + 1;
+      if (!resp) return;
+      const st = badgeEstadoJS(i.fields.status.name, i.fields.status.statusCategory && i.fields.status.statusCategory.name);
+      if (st === 'final') {
+        cargaEntregadoMap[resp] = (cargaEntregadoMap[resp]||0) + 1;
+        const resFecha = i.fields[resolvedFieldId] ? new Date(i.fields[resolvedFieldId]) : null;
+        if (resFecha) {
+          const mesNombre = MESES_ORDEN_CARGA[resFecha.getMonth()];
+          cargaMesMap[mesNombre] = cargaMesMap[mesNombre] || {};
+          cargaMesMap[mesNombre][resp] = (cargaMesMap[mesNombre][resp]||0) + 1;
+        }
+      } else if (st === 'progress' || st === 'blocked') {
+        cargaEnCursoMap[resp] = (cargaEnCursoMap[resp]||0) + 1;
+      } else {
+        cargaSinIniciarMap[resp] = (cargaSinIniciarMap[resp]||0) + 1;
       }
     }
   });
-  const cargaTrabajo = Object.entries(cargaMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([persona,cantidad])=>({persona,cantidad}));
-  const cargaFin = Object.entries(cargaFinMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([persona,cantidad])=>({persona,cantidad}));
-  const cargaCurso = Object.entries(cargaCursoMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([persona,cantidad])=>({persona,cantidad}));
+  const personasCarga = new Set([...Object.keys(cargaEntregadoMap), ...Object.keys(cargaEnCursoMap), ...Object.keys(cargaSinIniciarMap)]);
+  const cargaComposicion = [...personasCarga].map(persona => {
+    const entregado = cargaEntregadoMap[persona]||0, curso = cargaEnCursoMap[persona]||0, sinIniciar = cargaSinIniciarMap[persona]||0;
+    return { persona, entregado, curso, sinIniciar, total: entregado+curso+sinIniciar };
+  }).sort((a,b)=>b.total-a.total).slice(0,10);
+
+  const cargaPorMes = {};
+  Object.keys(cargaMesMap).forEach(mes => {
+    cargaPorMes[mes] = Object.entries(cargaMesMap[mes]).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([persona,cantidad])=>({persona,cantidad}));
+  });
+  const cargaTrabajo = cargaComposicion.map(c=>({persona:c.persona, cantidad:c.total}));
 
   // Performance: cumplimiento, vencidas por persona, WIP
   const onTime = {}, comparable = {};
@@ -948,11 +1068,38 @@ function transformAppTuData(issues, fieldNames) {
 
   const wipMap = {};
   digIssues.forEach(i => {
-    const cat = i.fields.status.statusCategory && i.fields.status.statusCategory.key;
     const resp = i.fields.assignee && i.fields.assignee.displayName;
-    if (cat === 'indeterminate' && resp) wipMap[resp] = (wipMap[resp]||0)+1;
+    if (i.fields.status.name === 'En progreso' && resp) wipMap[resp] = (wipMap[resp]||0)+1;
   });
   const wip = Object.entries(wipMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([persona,cantidad])=>({persona,cantidad}));
+
+  // Doble riesgo: personas con vencidas Y con WIP alto al mismo tiempo
+  const vencSet = {}; vencidasPorPersona.forEach(v=>{ vencSet[v.persona]=v.cantidad; });
+  const wipSet = {}; wip.forEach(w=>{ wipSet[w.persona]=w.cantidad; });
+  const dobleRiesgo = Object.keys(vencSet).filter(p=>wipSet[p]).map(p=>({persona:p, vencidas:vencSet[p], wip:wipSet[p]}))
+    .sort((a,b)=>(b.vencidas+b.wip)-(a.vencidas+a.wip)).slice(0,3);
+
+  // Tiempo promedio de resolución por persona
+  const tiempoResMap = {};
+  digIssues.forEach(i => {
+    const resp = i.fields.assignee && i.fields.assignee.displayName;
+    const c = i.fields.created ? new Date(i.fields.created) : null;
+    const r = i.fields[resolvedFieldId] ? new Date(i.fields[resolvedFieldId]) : null;
+    if (resp && c && r) {
+      tiempoResMap[resp] = tiempoResMap[resp] || [];
+      tiempoResMap[resp].push((r-c)/(1000*60*60*24));
+    }
+  });
+  const tiempoResolucion = Object.entries(tiempoResMap)
+    .map(([persona,arr])=>({persona, dias: Math.round(arr.reduce((a,b)=>a+b,0)/arr.length*10)/10, cantidad: arr.length}))
+    .filter(x=>x.cantidad>=2)
+    .sort((a,b)=>a.dias-b.dias);
+
+  // Antigüedad de ítems en pausa
+  const pausados = digIssues.filter(i => i.fields.status.name === 'EN PAUSA').map(i => {
+    const upd = i.fields.updated ? new Date(i.fields.updated) : null;
+    return { desc: (i.fields.summary||'').slice(0,60), dias: upd ? Math.floor((today-upd)/(1000*60*60*24)) : 0 };
+  }).sort((a,b)=>b.dias-a.dias);
 
   const todosAsignadosSet = new Set();
   digIssues.forEach(i => {
@@ -966,13 +1113,13 @@ function transformAppTuData(issues, fieldNames) {
     mejoraContinua: { total: mcItems.length, listo: mcListo, pct: mcItems.length ? Math.round(mcListo/mcItems.length*100):0, items: mcOut },
     tareaTipo: { total: tareaItems.length, listo: tareaListo, pct: tareaItems.length ? Math.round(tareaListo/tareaItems.length*100):0 },
     bigNumbers: { proyectosEnProgreso, enPausaOBloqueadas: enPausa, vencen7Dias: vencen7, vencidas },
-    cargaTrabajo, cargaFin, cargaCurso,
+    cargaTrabajo, cargaComposicion, cargaPorMes,
     performance: { totalTareasGlobal: digIssues.filter(i=>i.fields.issuetype.name!=='Epic').length, vencidasGlobal: vencidas, vencidasAltaPrioridad: digIssues.filter(i=>{
         const due = i.fields[dueFieldId] ? new Date(i.fields[dueFieldId]) : null;
         const isDone = i.fields.status.statusCategory && i.fields.status.statusCategory.key === 'done';
         return due && !isDone && due<today && ['Highest','High'].includes(i.fields.priority && i.fields.priority.name);
       }).length,
-      cumplimiento, vencidasPorPersona, wip, todosAsignados
+      cumplimiento, vencidasPorPersona, wip, todosAsignados, tiempoResolucion, pausados, dobleRiesgo
     }
   };
 }
