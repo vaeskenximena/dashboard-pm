@@ -242,9 +242,6 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
       <div class="mc-ministat"><div class="mc-ministat-label">No iniciadas</div><div class="mc-ministat-num" id="mc-stat-noini" style="color:#c47a00;">0</div></div>
     </div>
 
-    <div class="chart-title" style="margin-bottom:10px; display:flex; align-items:center; gap:8px;">🚀 Implementadas en PROD / BETA</div>
-    <div id="mc-detail-implementadas"></div>
-
     <div class="chart-title" style="margin:20px 0 10px; display:flex; align-items:center; gap:8px;">⏱️ En progreso / En pausa</div>
     <div id="mc-detail-enprogreso" class="mc-list-card"></div>
 
@@ -701,14 +698,6 @@ function toggleMcDetail() {
   chev.classList.toggle('open', !open);
 }
 
-const MESES_NOMBRE_MC = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-function mesDeFecha(ddmmyyyy) {
-  if (!ddmmyyyy) return 'Sin fecha';
-  const partes = ddmmyyyy.split('/');
-  if (partes.length!==3) return 'Sin fecha';
-  return MESES_NOMBRE_MC[parseInt(partes[1],10)] + ' ' + partes[2];
-}
-
 function iniciales(nombre) {
   if (!nombre || nombre==='Sin asignar') return '?';
   const partes = nombre.trim().split(/\s+/);
@@ -725,31 +714,6 @@ function renderMcDetail() {
   document.getElementById('mc-stat-impl').textContent = implementadas.length;
   document.getElementById('mc-stat-curso').textContent = enProgresoPausa.length;
   document.getElementById('mc-stat-noini').textContent = noIniciadas;
-
-  const grupos = {};
-  implementadas.forEach(it => {
-    const mes = mesDeFecha(it.resuelta);
-    grupos[mes] = grupos[mes] || [];
-    grupos[mes].push(it);
-  });
-  const mesesOrdenados = Object.keys(grupos).sort((a,b)=>{
-    if (a==='Sin fecha') return 1; if (b==='Sin fecha') return -1;
-    return 0;
-  });
-
-  document.getElementById('mc-detail-implementadas').innerHTML = mesesOrdenados.length ? `<div class="mc-timeline">` + mesesOrdenados.map(mes => `
-    <div class="mc-month-group">
-      <div class="mc-month-dot ${mes==='Sin fecha'?'sinfecha':''}"></div>
-      <div class="mc-month-label">${mes}</div>
-      ${grupos[mes].map(it=>`
-        <div class="mc-impl-row">
-          <span>${it.desc}</span>
-          <div class="mc-person">
-            <div class="mc-avatar">${iniciales(it.resp)}</div>
-            <span class="mc-person-name">${it.resp}</span>
-          </div>
-        </div>`).join('')}
-    </div>`).join('') + `</div>` : '<div style="font-size:12px;color:#a8a297;">Ninguna implementada en PROD/BETA todavía.</div>';
 
   document.getElementById('mc-detail-enprogreso').innerHTML = enProgresoPausa.length ? enProgresoPausa.map(it=>`
     <div class="mc-list-row">
