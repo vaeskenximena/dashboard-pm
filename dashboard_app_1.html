@@ -212,37 +212,28 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
   </div>
 
   <!-- Mejora continua -->
-  <div class="chart-card" style="cursor:pointer;margin-bottom:1.5rem;" onclick="toggleMcDetail()">
+  <div class="chart-card" style="margin-bottom:1.5rem;">
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div class="chart-title">Mejora Continua</div>
-      <span class="chevron open" id="mc-chevron" style="font-size:11px;color:#a8a297;">▼</span>
     </div>
     <div class="chart-sub" id="mc-sub"></div>
     <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:4px;">
-      <div class="donut-row" onclick="event.stopPropagation()" style="flex-shrink:0;">
+      <div class="donut-row" style="flex-shrink:0;">
         <div class="donut-wrap"><canvas id="donutMC" width="100" height="100"></canvas><div class="donut-center"><div class="donut-pct" id="mc-pct" style="color:#1558a0">0%</div><div class="donut-label">listo</div></div></div>
         <div class="donut-legend" id="mc-legend"></div>
       </div>
-      <div style="flex:1;min-width:180px;border-left:1px solid #f0efe9;padding-left:20px;" onclick="event.stopPropagation()">
+      <div style="flex:1;min-width:180px;border-left:1px solid #f0efe9;padding-left:20px;">
         <div style="font-size:11px;font-weight:700;color:#8a8578;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px;">Top 3 · Publicadas e Implementadas</div>
         <div id="mc-top3"></div>
       </div>
     </div>
-    <div id="mc-filtered-list" onclick="event.stopPropagation()"></div>
-    <div style="border-top:1px solid #f0efe9;margin-top:16px;padding-top:16px;" onclick="event.stopPropagation()">
+    <div id="mc-filtered-list"></div>
+    <div style="border-top:1px solid #f0efe9;margin-top:16px;padding-top:16px;">
       <div class="chart-title" style="margin-bottom:10px;">Publicadas e implementadas por mes</div>
       <div class="chart-box" style="height:160px;"><canvas id="mcMesChart"></canvas></div>
     </div>
   </div>
 
-  <div class="chart-card" id="mc-detail-panel" style="display:none;margin-bottom:1.5rem;">
-    <div class="mc-ministats">
-      <div class="mc-ministat"><div class="mc-ministat-label">Implementadas</div><div class="mc-ministat-num" id="mc-stat-impl">0</div></div>
-      <div class="mc-ministat"><div class="mc-ministat-label">En curso / pausa</div><div class="mc-ministat-num" id="mc-stat-curso">0</div></div>
-      <div class="mc-ministat"><div class="mc-ministat-label">No iniciadas</div><div class="mc-ministat-num" id="mc-stat-noini" style="color:#c47a00;">0</div></div>
-    </div>
-
-  </div>
 
   <!-- Carga de trabajo -->
   <div class="chart-card" style="margin-bottom:1.5rem;">
@@ -616,7 +607,6 @@ function renderMejoraContinua() {
     });
   }
   document.getElementById('mc-legend').innerHTML = labels.map((l,i)=>`<div class="legend-item" style="cursor:pointer;" onclick="mostrarMcFiltrado('${catKeys[i]}','${l}')"><div class="legend-dot" style="background:${colors[i]}"></div>${l}: ${data[i]}</div>`).join('');
-  renderMcDetail();
 
   const topMap = {};
   mc.items.forEach(it => {
@@ -682,32 +672,12 @@ function mostrarMcFiltrado(catKey, label) {
     </div>`;
 }
 
-function toggleMcDetail() {
-  const panel = document.getElementById('mc-detail-panel');
-  const chev = document.getElementById('mc-chevron');
-  const open = panel.style.display !== 'none';
-  panel.style.display = open ? 'none' : 'block';
-  chev.classList.toggle('open', !open);
-}
-
 function iniciales(nombre) {
   if (!nombre || nombre==='Sin asignar') return '?';
   const partes = nombre.trim().split(/\s+/);
   return (partes[0][0] + (partes[1] ? partes[1][0] : '')).toUpperCase();
 }
 
-function renderMcDetail() {
-  const items = DATA.mejoraContinua.items || [];
-
-  const implementadas = items.filter(it => it.estadoRaw==='Implementado Prod' || it.estadoRaw==='BETA');
-  const enProgresoPausa = items.filter(it => it.estadoRaw==='En progreso' || it.estadoRaw==='EN PAUSA');
-  const noIniciadas = items.filter(it => it.estadoRaw==='Por hacer' || it.estadoRaw==='BACKLOG').length;
-
-  document.getElementById('mc-stat-impl').textContent = implementadas.length;
-  document.getElementById('mc-stat-curso').textContent = enProgresoPausa.length;
-  document.getElementById('mc-stat-noini').textContent = noIniciadas;
-
-}
 
 function toggleProject(id) {
   const b=document.getElementById('body-'+id), c=document.getElementById('chev-'+id);
