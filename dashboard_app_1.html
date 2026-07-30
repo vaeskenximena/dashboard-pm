@@ -207,7 +207,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
   <!-- % avance por épica (unificado) -->
   <div class="chart-card" style="margin-bottom:1.5rem;">
     <div class="chart-title">% de avance por proyecto</div>
-    <div class="chart-sub">% de avance del proyecto (finalizado + publicado + implementado + beta) · cantidad de tareas dentro de la barra</div>
+    <div class="chart-sub">% de avance del proyecto (finalizado) · cantidad de tareas dentro de la barra</div>
     <div id="rank-epicas"></div>
   </div>
 
@@ -294,6 +294,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
           </div>
           <div>
             <div class="perf-section-label">Tiempo prom. resolución</div>
+            <div style="font-size:11px;color:#8a8578;margin:-4px 0 8px;">Desde "En curso" hasta "Finalizado"</div>
             <div id="perf-tiempo-res"></div>
           </div>
         </div>
@@ -590,7 +591,7 @@ function renderMejoraContinua() {
   document.getElementById('mc-pct').textContent = pctReal + '%';
   const data = [c.publicadas, c.implementadas, c.beta, c.finalizadas, c.curso, c.pausa, c.porhacer, c.backlog];
   const colors = ['#0f9e88','#2d7a27','#8a3ffc','#6b9ce8','#1558a0','#a02020','#c47a00','#948e80'];
-  const labels = ['Publicadas','Implementadas','Beta','Finalizadas (pend. implementación)','En curso','En pausa','Por hacer','Backlog'];
+  const labels = ['Publicadas','Implementadas','Beta','Finalizadas','En curso','En pausa','Por hacer','Backlog'];
   const catKeys = ['publicadas','implementadas','beta','finalizadas','curso','pausa','porhacer','backlog'];
   if (donutMC) { donutMC.data.datasets[0].data = data; donutMC.update(); }
   else {
@@ -941,13 +942,16 @@ function transformAppTuData(issues, fieldNames) {
   const cargaTrabajo = cargaComposicion.map(c=>({persona:c.persona, cantidad:c.total}));
 
   // Performance: cumplimiento, vencidas por persona, WIP
+  // Personas excluidas del cálculo de Performance Equipo (no son desarrolladores)
+  const PERF_EXCLUDED = ['Heidy Fabiola Lara Sanguina','Heidy Lara','Roque Peralta','Ximena','Martin Jara','Ana Ortiz','Ana','Vanesa Diarte','Vanessa Diarte'];
+  const isDevResp = (resp) => resp && !PERF_EXCLUDED.includes(resp);
   const onTime = {}, comparable = {};
   digIssues.forEach(i => {
     if (i.fields.status.statusCategory && i.fields.status.statusCategory.key === 'done') {
       const resuelta = i.fields[resolvedFieldId] ? new Date(i.fields[resolvedFieldId]) : null;
       const due = i.fields[dueFieldId] ? new Date(i.fields[dueFieldId]) : null;
       const resp = i.fields.assignee && i.fields.assignee.displayName;
-      if (resuelta && due && resp) {
+      if (resuelta && due && isDevResp(resp)) {
         comparable[resp] = (comparable[resp]||0) + 1;
         if (resuelta <= due) onTime[resp] = (onTime[resp]||0) + 1;
       }
@@ -963,14 +967,14 @@ function transformAppTuData(issues, fieldNames) {
     const due = i.fields[dueFieldId] ? new Date(i.fields[dueFieldId]) : null;
     const isDone = i.fields.status.statusCategory && i.fields.status.statusCategory.key === 'done';
     const resp = i.fields.assignee && i.fields.assignee.displayName;
-    if (due && !isDone && due < today && resp) vencPersonaMap[resp] = (vencPersonaMap[resp]||0)+1;
+    if (due && !isDone && due < today && isDevResp(resp)) vencPersonaMap[resp] = (vencPersonaMap[resp]||0)+1;
   });
   const vencidasPorPersona = Object.entries(vencPersonaMap).sort((a,b)=>b[1]-a[1]).map(([persona,cantidad])=>({persona,cantidad}));
 
   const wipMap = {};
   digIssues.forEach(i => {
     const resp = i.fields.assignee && i.fields.assignee.displayName;
-    if (i.fields.status.name === 'En progreso' && resp) wipMap[resp] = (wipMap[resp]||0)+1;
+    if (i.fields.status.name === 'En progreso' && isDevResp(resp)) wipMap[resp] = (wipMap[resp]||0)+1;
   });
   const wip = Object.entries(wipMap).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([persona,cantidad])=>({persona,cantidad}));
 
@@ -980,15 +984,15 @@ function transformAppTuData(issues, fieldNames) {
   const dobleRiesgo = Object.keys(vencSet).filter(p=>wipSet[p]).map(p=>({persona:p, vencidas:vencSet[p], wip:wipSet[p]}))
     .sort((a,b)=>(b.vencidas+b.wip)-(a.vencidas+a.wip)).slice(0,3);
 
-  // Tiempo promedio de resolución por persona
+  // Tiempo promedio de resolución por persona (desde que entró a "En progreso" hasta "Finalizado")
   const tiempoResMap = {};
   digIssues.forEach(i => {
     const resp = i.fields.assignee && i.fields.assignee.displayName;
-    const c = i.fields.created ? new Date(i.fields.created) : null;
+    const inicioProgreso = i.fields.__progresoDesde ? new Date(i.fields.__progresoDesde) : null;
     const r = i.fields[resolvedFieldId] ? new Date(i.fields[resolvedFieldId]) : null;
-    if (resp && c && r) {
+    if (isDevResp(resp) && inicioProgreso && r && r >= inicioProgreso) {
       tiempoResMap[resp] = tiempoResMap[resp] || [];
-      tiempoResMap[resp].push((r-c)/(1000*60*60*24));
+      tiempoResMap[resp].push((r-inicioProgreso)/(1000*60*60*24));
     }
   });
   const tiempoResolucion = Object.entries(tiempoResMap)
@@ -1005,7 +1009,7 @@ function transformAppTuData(issues, fieldNames) {
   const todosAsignadosSet = new Set();
   digIssues.forEach(i => {
     const resp = i.fields.assignee && i.fields.assignee.displayName;
-    if (resp) todosAsignadosSet.add(resp);
+    if (isDevResp(resp)) todosAsignadosSet.add(resp);
   });
   const todosAsignados = [...todosAsignadosSet];
 
