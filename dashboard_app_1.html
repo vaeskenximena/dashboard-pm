@@ -149,6 +149,35 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
   .macro-resp { font-size:11.5px; color:#8a8578; width:130px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .tipo-tag { font-size:10.5px; color:#a8a297; font-weight:600; }
 
+  .squad-row { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:10px; }
+  .squad-label { font-size:10.5px; font-weight:700; color:#a8a297; text-transform:uppercase; letter-spacing:.04em; margin-right:2px; }
+  .squad-chip { display:inline-flex; align-items:center; gap:5px; background:#eaf1fa; color:#1a4d8f; font-size:11px; font-weight:600; padding:2px 10px 2px 3px; border-radius:999px; }
+  .squad-avatar { width:17px; height:17px; border-radius:50%; background:#1558a0; color:#fff; font-size:8.5px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .squad-empty { font-size:11.5px; color:#a8a297; }
+
+  .project-stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:14px; }
+  .pstat { background:#faf9f5; border-radius:8px; padding:9px 12px; }
+  .pstat-label { font-size:10.5px; color:#8a8578; margin-bottom:2px; }
+  .pstat-num { font-size:18px; font-weight:700; color:#1a1a18; }
+  .pstat.pct .pstat-num { color:#1558a0; }
+  .pstat.bugs .pstat-num { color:#a02020; }
+
+  .proj-progress-track { background:#e2e0d8; border-radius:999px; height:6px; margin-top:12px; overflow:hidden; }
+  .proj-progress-fill { height:100%; border-radius:999px; background:#1558a0; }
+
+  .table-wrap { overflow-x:auto; }
+  table.tasks-table { width:100%; border-collapse:collapse; font-size:12px; min-width:840px; }
+  table.tasks-table th { text-align:left; font-size:10.5px; font-weight:700; color:#a8a297; text-transform:uppercase; letter-spacing:.03em; padding:9px 14px; background:#faf9f5; border-bottom:1px solid #f0efe9; white-space:nowrap; }
+  table.tasks-table td { padding:9px 14px; border-bottom:1px solid #f5f4ee; white-space:nowrap; }
+  table.tasks-table td.wrap { white-space:normal; min-width:200px; }
+  .gap-ok { color:#2d7a27; font-weight:700; }
+  .gap-bad { color:#a02020; font-weight:700; }
+  .gap-none { color:#a8a297; }
+
+  .risk-banner { display:flex; align-items:center; gap:8px; padding:12px 18px; font-size:12.5px; font-weight:600; border-top:1px solid #f0efe9; }
+  .risk-ok { background:#e2f0db; color:#1e6b18; }
+  .risk-bad { background:#fde4e4; color:#941818; }
+
   .btn-perf { padding:8px 14px; border-radius:8px; border:1px solid #1558a0; background:#eaf1fa; color:#1558a0; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; flex-shrink:0; white-space:nowrap; transition:background .15s; }
   .btn-perf:hover { background:#ddeaf8; }
 
@@ -204,15 +233,45 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
     <div class="bn-card" style="--accent:#a02020"><div class="bn-label">Vencidas sin cerrar</div><div class="bn-num" id="bn-vencidas">0</div><div class="bn-sub">requieren atención</div></div>
   </div>
 
-  <!-- % avance por épica (unificado) -->
-  <div class="chart-card" style="margin-bottom:1.5rem;">
-    <div class="chart-title">% de avance por proyecto</div>
-    <div class="chart-sub">% de avance del proyecto (finalizado) · cantidad de tareas dentro de la barra</div>
-    <div id="rank-epicas"></div>
+  <!-- Filtros -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <div class="filter-label">Proyecto</div>
+      <select class="filter-select" id="f-epica"><option value="all">Todos</option></select>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Persona</div>
+      <select class="filter-select" id="f-persona"><option value="all">Todas</option></select>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Estado</div>
+      <select class="filter-select" id="f-estado">
+        <option value="all">Todos</option>
+        <option value="progress">En curso</option>
+        <option value="pending">Pendiente</option>
+        <option value="blocked">En pausa</option>
+        <option value="final">Finalizado</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Tipo</div>
+      <select class="filter-select" id="f-tipo">
+        <option value="all">Todos</option>
+        <option value="Tarea">Tarea</option>
+        <option value="Subtarea">Subtarea</option>
+        <option value="Mejora Continua">Mejora Continua</option>
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button class="btn-filter" onclick="applyFilters()">Aplicar</button>
+      <button class="btn-clear" onclick="clearFilters()">Limpiar</button>
+    </div>
   </div>
 
+  <div id="projects-container"></div>
+
   <!-- Mejora continua -->
-  <div class="chart-card" style="margin-bottom:1.5rem;">
+  <div class="chart-card" style="margin-bottom:1.5rem;margin-top:1.5rem;">
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div class="chart-title">Mejora Continua</div>
     </div>
@@ -316,42 +375,6 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
     </div>
   </div>
 
-  <!-- Filtros -->
-  <div class="filter-bar">
-    <div class="filter-group">
-      <div class="filter-label">Proyecto</div>
-      <select class="filter-select" id="f-epica"><option value="all">Todos</option></select>
-    </div>
-    <div class="filter-group">
-      <div class="filter-label">Persona</div>
-      <select class="filter-select" id="f-persona"><option value="all">Todas</option></select>
-    </div>
-    <div class="filter-group">
-      <div class="filter-label">Estado</div>
-      <select class="filter-select" id="f-estado">
-        <option value="all">Todos</option>
-        <option value="progress">En curso</option>
-        <option value="pending">Pendiente</option>
-        <option value="blocked">En pausa</option>
-        <option value="final">Finalizado</option>
-      </select>
-    </div>
-    <div class="filter-group">
-      <div class="filter-label">Tipo</div>
-      <select class="filter-select" id="f-tipo">
-        <option value="all">Todos</option>
-        <option value="Tarea">Tarea</option>
-        <option value="Subtarea">Subtarea</option>
-        <option value="Mejora Continua">Mejora Continua</option>
-      </select>
-    </div>
-    <div class="filter-actions">
-      <button class="btn-filter" onclick="applyFilters()">Aplicar</button>
-      <button class="btn-clear" onclick="clearFilters()">Limpiar</button>
-    </div>
-  </div>
-
-  <div id="projects-container"></div>
   <div class="last-updated" id="last-updated"></div>
 </div>
 
@@ -363,7 +386,6 @@ const statusMap = {
   final:{label:'Finalizado',cls:'b-final'}, progress:{label:'En curso',cls:'b-progress'},
   pending:{label:'Pendiente',cls:'b-pending'}, blocked:{label:'En pausa',cls:'b-blocked'}
 };
-const rankColors = ['#1558a0','#2a78d6','#3a8fe0','#4aa3ea','#5cb3f0','#1046a0','#0d3a80','#0a2f66','#082450'];
 
 let currentFilters = { epica:'all', persona:'all', estado:'all', tipo:'all' };
 
@@ -407,23 +429,6 @@ function renderBigNumbers() {
   document.getElementById('bn-pausa').textContent = DATA.bigNumbers.enPausaOBloqueadas;
   document.getElementById('bn-vencen').textContent = DATA.bigNumbers.vencen7Dias;
   document.getElementById('bn-vencidas').textContent = DATA.bigNumbers.vencidas;
-}
-
-function renderRankEpicas() {
-  const sorted = [...DATA.epics].sort((a,b)=>b.pct-a.pct);
-  document.getElementById('rank-epicas').innerHTML = sorted.map((e,i)=>{
-    const numLabel = e.pct > 0
-      ? `<span style="position:absolute;left:6px;top:50%;transform:translateY(-50%);font-size:10px;color:#fff;font-weight:700;">${e.total}</span>`
-      : `<span style="position:absolute;left:6px;top:50%;transform:translateY(-50%);font-size:10px;color:#8a8578;font-weight:700;">${e.total}</span>`;
-    return `<div class="rank-row">
-      <div class="rank-name" title="${e.name}">${e.name}</div>
-      <div class="rank-track" style="position:relative;height:16px;">
-        <div class="rank-fill" style="width:${e.pct}%;background:${rankColors[i%rankColors.length]};height:100%;"></div>
-        ${numLabel}
-      </div>
-      <div class="rank-pct">${e.pct}%</div>
-    </div>`;
-  }).join('');
 }
 
 let cargaMesActual = null;
@@ -706,6 +711,26 @@ function badgeGranular(estadoRaw) {
   return {label:'Backlog', cls:'b-backlog'};
 }
 
+function computeGap(it) {
+  const today = new Date();
+  const deadline = (it.deadlineSort && it.deadlineSort!=='9999-99-99') ? new Date(it.deadlineSort) : null;
+  if (it.status === 'final') {
+    if (it.finRealSort && it.finRealSort!=='9999-99-99' && deadline) {
+      const diffDays = Math.round((new Date(it.finRealSort) - deadline) / (1000*60*60*24));
+      if (diffDays <= 0) return { text: diffDays===0 ? '0 días' : `${diffDays} días`, cls: 'gap-ok' };
+      return { text: `+${diffDays} días`, cls: 'gap-bad' };
+    }
+    return { text: '—', cls: 'gap-none' };
+  }
+  if (deadline && deadline < today) {
+    const diffDays = Math.round((today - deadline) / (1000*60*60*24));
+    return { text: `vencida hace ${diffDays} día${diffDays!==1?'s':''}`, cls: 'gap-bad' };
+  }
+  if (it.status === 'progress') return { text: '— en curso', cls: 'gap-none' };
+  if (it.status === 'blocked') return { text: '— en pausa', cls: 'gap-none' };
+  return { text: '— sin iniciar', cls: 'gap-none' };
+}
+
 function render() {
   const container = document.getElementById('projects-container');
   container.innerHTML = '';
@@ -717,33 +742,66 @@ function render() {
     const doneTasks = epic.items.filter(it=>it.directChild && it.status==='final').sort((a,b)=>a.inicioSort.localeCompare(b.inicioSort));
     const restTasks = epic.items.filter(it=>it.directChild && it.status!=='final').sort((a,b)=>a.inicioSort.localeCompare(b.inicioSort));
     const macroTasks = [...doneTasks, ...restTasks];
-    const macroHtml = macroTasks.length ? `
-      <div class="macro-section">
-        <div class="macro-title">Tareas macro del proyecto</div>
-        ${macroTasks.map(it=>{
-          const b = badgeGranular(it.estadoRaw);
-          return `
-          <div class="macro-row">
-            <div class="macro-check ${it.status==='final'?'done':''}">${it.status==='final'?'✓':''}</div>
-            <div class="macro-key">${it.key}</div>
-            <div class="macro-name ${it.status==='final'?'done':''}">${it.desc}</div>
-            <div class="macro-resp" title="${it.resp}">${it.resp}</div>
-            <span class="badge ${b.cls}">${b.label}</span>
-          </div>`;
-        }).join('')}
-      </div>` : `<div class="macro-section"><div class="macro-title">Tareas macro del proyecto</div><div style="font-size:12px;color:#a8a297;padding:6px 0;">Todavía no hay tareas macro cargadas en Jira para este proyecto.</div></div>`;
+
+    const squadHtml = epic.squad.length
+      ? epic.squad.map(p=>`<span class="squad-chip"><span class="squad-avatar">${iniciales(p)}</span>${p}</span>`).join('')
+      : '<span class="squad-empty">Sin integrantes asignados todavía.</span>';
+
+    const tableRows = macroTasks.length ? macroTasks.map(it=>{
+      const b = badgeGranular(it.estadoRaw);
+      const gap = computeGap(it);
+      return `<tr>
+        <td>${it.key}</td>
+        <td class="wrap">${it.desc}</td>
+        <td>${it.resp}</td>
+        <td><span class="badge ${b.cls}">${b.label}</span></td>
+        <td>${it.inicio||'—'}</td>
+        <td>${it.deadline||'—'}</td>
+        <td>${it.inicioReal||'—'}</td>
+        <td>${it.finReal||'—'}</td>
+        <td><span class="${gap.cls}">${gap.text}</span></td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="9" style="color:#a8a297;padding:14px;">Todavía no hay tareas macro cargadas en Jira para este proyecto.</td></tr>`;
+
+    const vencidasMacro = macroTasks.filter(it=>{
+      if (it.status==='final') return false;
+      if (!it.deadlineSort || it.deadlineSort==='9999-99-99') return false;
+      return new Date(it.deadlineSort) < new Date();
+    });
+    const riskHtml = vencidasMacro.length
+      ? `<div class="risk-banner risk-bad">⚠️ Proyecto con desvío — ${vencidasMacro.length} tarea${vencidasMacro.length!==1?'s':''} macro vencida${vencidasMacro.length!==1?'s':''} sin cerrar (${vencidasMacro.map(v=>v.key).join(', ')})</div>`
+      : `<div class="risk-banner risk-ok">✅ Según lo planificado — sin tareas macro vencidas</div>`;
+
     const card = document.createElement('div'); card.className='project-card';
     card.innerHTML = `
       <div class="project-header" onclick="toggleProject('${sid}')">
-        <div class="project-name">📦 ${epic.name}</div>
-        <div class="project-meta">
-          <span class="project-pct" style="color:${epic.pct===100?'#2d7a27':'#1558a0'}">${epic.pct}%</span>
-          <span>${macroTasks.length} tarea${macroTasks.length!==1?'s':''} macro</span>
-          <span class="chevron open" id="chev-${sid}">▼</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div class="project-name">📦 ${epic.name}</div>
+          <div style="display:flex;align-items:center;gap:14px;">
+            <span style="font-size:12.5px;color:#8a8578;">${epic.total} tarea${epic.total!==1?'s':''} totales</span>
+            <span class="chevron open" id="chev-${sid}">▼</span>
+          </div>
         </div>
+        <div class="squad-row"><span class="squad-label">Squad</span>${squadHtml}</div>
+        <div class="project-stats-row">
+          <div class="pstat pct"><div class="pstat-label">% de avance</div><div class="pstat-num">${epic.pct}%</div></div>
+          <div class="pstat"><div class="pstat-label">Tareas macro (tipo Tarea)</div><div class="pstat-num">${epic.tareasMacroCount}</div></div>
+          <div class="pstat"><div class="pstat-label">Subtareas</div><div class="pstat-num">${epic.subtareasCount}</div></div>
+          <div class="pstat bugs"><div class="pstat-label">Errores / Bugs</div><div class="pstat-num">${epic.bugsCount}</div></div>
+        </div>
+        <div class="proj-progress-track"><div class="proj-progress-fill" style="width:${epic.pct}%;background:${epic.pct===100?'#2d7a27':'#1558a0'}"></div></div>
       </div>
       <div class="body-section open" id="body-${sid}">
-        ${macroHtml}
+        <div class="table-wrap">
+          <table class="tasks-table">
+            <thead><tr>
+              <th>Código</th><th>Nombre</th><th>Persona</th><th>Estado</th>
+              <th>Inicio plan.</th><th>Vencimiento</th><th>Inicio real</th><th>Fin real</th><th>Gap</th>
+            </tr></thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </div>
+        ${riskHtml}
       </div>`;
     container.appendChild(card);
   });
@@ -753,7 +811,6 @@ function render() {
 document.getElementById('dashdate').textContent = new Date().toLocaleDateString('es-PY',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 populateDropdowns();
 renderBigNumbers();
-renderRankEpicas();
 renderRankCarga();
 renderMejoraContinua();
 render();
@@ -808,6 +865,8 @@ function transformAppTuData(issues, fieldNames) {
   const resolvedFieldId = 'resolutiondate';
   const updatedFieldId = 'updated';
   const startFieldId = findFieldId(fieldNames, 'fecha de inicio') || findFieldId(fieldNames, 'start date');
+  const actualStartFieldId = findFieldId(fieldNames, 'actual start');
+  const actualEndFieldId = findFieldId(fieldNames, 'actual end');
 
   // Filtrar solo issues del proyecto DIG (APP TU)
   const digIssues = issues.filter(i => i.key.startsWith('DIG-'));
@@ -823,7 +882,7 @@ function transformAppTuData(issues, fieldNames) {
     return resolveEpic(byKey[parentKey], depth+1);
   }
 
-  const leafTypes = ['Tarea','Subtarea','Mejora Continua','Historia'];
+  const leafTypes = ['Tarea','Subtarea','Mejora Continua','Historia','Error'];
   const epics = [];
   Object.keys(EPIC_NAMES_APP).forEach(ekey => {
     const epicIssue = byKey[ekey];
@@ -835,6 +894,8 @@ function transformAppTuData(issues, fieldNames) {
       const st = badgeEstadoJS(it.fields.status.name, it.fields.status.statusCategory && it.fields.status.statusCategory.name);
       if (it.fields.status.statusCategory && it.fields.status.statusCategory.key === 'done') listo++;
       const inicioRaw = startFieldId ? it.fields[startFieldId] : null;
+      const inicioRealRaw = actualStartFieldId ? it.fields[actualStartFieldId] : null;
+      const finRealRaw = actualEndFieldId ? it.fields[actualEndFieldId] : null;
       return {
         key: it.key,
         desc: (it.fields.summary||'').slice(0,90),
@@ -843,19 +904,30 @@ function transformAppTuData(issues, fieldNames) {
         estadoRaw: it.fields.status.name,
         pct: STATUS_PCT_JS[st],
         deadline: fmtDateISO(it.fields[dueFieldId]),
+        deadlineSort: sortKeyISO(it.fields[dueFieldId]),
         resuelta: fmtDateISO(it.fields[resolvedFieldId]),
         inicio: fmtDateISO(inicioRaw),
         inicioSort: sortKeyISO(inicioRaw),
+        inicioReal: fmtDateISO(inicioRealRaw),
+        finReal: fmtDateISO(finRealRaw),
+        finRealSort: sortKeyISO(finRealRaw),
         tipo: it.fields.issuetype.name,
         directChild: (it.fields.parent && it.fields.parent.key) === ekey
       };
     });
     const pct = total ? Math.round(listo/total*100) : 0;
+    const squadSet = new Set();
+    items.forEach(it => { if (it.resp && it.resp !== 'Sin asignar') squadSet.add(it.resp); });
+    const tareasMacroCount = items.filter(it => it.tipo === 'Tarea').length;
+    const subtareasCount = items.filter(it => it.tipo === 'Subtarea').length;
+    const bugsCount = items.filter(it => it.tipo === 'Error').length;
     epics.push({
       key: ekey, name: EPIC_NAMES_APP[ekey],
       estado: epicIssue.fields.status.name,
       responsable: (epicIssue.fields.assignee && epicIssue.fields.assignee.displayName) || 'Sin asignar',
       deadline: fmtDateISO(epicIssue.fields[dueFieldId]),
+      squad: [...squadSet].sort(),
+      tareasMacroCount, subtareasCount, bugsCount,
       total, listo, pct, items
     });
   });
@@ -1053,7 +1125,7 @@ async function syncFromJira() {
     document.getElementById('f-epica').innerHTML = '<option value="all">Todos</option>';
     document.getElementById('f-persona').innerHTML = '<option value="all">Todas</option>';
     populateDropdowns();
-    renderBigNumbers(); renderRankEpicas(); renderRankCarga();
+    renderBigNumbers(); renderRankCarga();
     renderMejoraContinua(); render();
     setSyncStatus('✅ Sincronizado con Jira — ' + new Date().toLocaleTimeString('es-PY') + ` (${json.total} tickets de DIG+UXUI recibidos)`, 'ok');
   } catch (e) {
