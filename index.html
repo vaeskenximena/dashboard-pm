@@ -118,7 +118,28 @@
 
   .footer { margin-top: 2.5rem; font-size: 12px; color: #b0afa8; text-align: center; }
 
-  @media (max-width: 860px) { .cards { grid-template-columns: repeat(2, 1fr); } }
+  /* ── Monitoreo: Equipo Desarrollo ── */
+  .group-label { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #a8a297; margin: 0 0 10px 2px; }
+  .group-label.mt { margin-top: 2rem; }
+  .mon-card {
+    display: grid; grid-template-columns: 1.1fr 2fr; gap: 24px; align-items: center;
+    background: #fff; border-radius: 14px; border-left: 5px solid #0e7c78;
+    padding: 24px 26px; text-decoration: none; color: inherit;
+    box-shadow: 0 2px 6px rgba(20,20,15,0.03);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .mon-card:hover { box-shadow: 0 10px 28px rgba(20,20,15,0.09); transform: translateY(-3px); }
+  .mon-card .card-cta { color: #0e7c78; }
+  .mon-fecha { font-size: 11.5px; color: #b0afa8; margin-top: 6px; }
+  .mon-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .mon-stat { background: #f4f3ef; border-radius: 12px; padding: 12px 14px; }
+  .mon-stat .v { font-size: 26px; font-weight: 800; line-height: 1; color: #1a1a18; font-variant-numeric: tabular-nums; }
+  .mon-stat .l { font-size: 11.5px; color: #7a7a72; font-weight: 600; margin-top: 6px; }
+  .mon-stat.late .v { color: #b42318; }
+  .mon-stat.warn .v { color: #b76e00; }
+
+  @media (max-width: 860px) { .cards { grid-template-columns: repeat(2, 1fr); } .mon-card { grid-template-columns: 1fr; } }
+  @media (max-width: 480px) { .mon-stats { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 480px) { .cards { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -168,6 +189,7 @@
       <p>Seleccioná el dashboard que querés ver</p>
     </div>
 
+    <div class="group-label">Proyectos</div>
     <div class="cards">
       <a class="card" href="dashboard_app_1.html" style="--accent:#1558a0;">
         <div class="card-icon">📱</div>
@@ -197,6 +219,23 @@
         <div class="card-cta">Ver dashboard →</div>
       </a>
     </div>
+
+    <div class="group-label mt">Monitoreo</div>
+    <a class="mon-card" href="equipo_desarrollo.html">
+      <div>
+        <div class="card-icon">👥</div>
+        <div class="card-title" style="margin:8px 0 6px">Equipo Desarrollo</div>
+        <div class="card-desc">Disponibilidad, carga y vencimientos del equipo en Jira WEB y DIG.</div>
+        <div class="card-cta" style="margin-top:10px">Ver radar →</div>
+        <div class="mon-fecha" id="mon-fecha"></div>
+      </div>
+      <div class="mon-stats">
+        <div class="mon-stat"><div class="v" id="mon-abiertas">—</div><div class="l">Tareas abiertas</div></div>
+        <div class="mon-stat late"><div class="v" id="mon-vencidas">—</div><div class="l">Tareas vencidas</div></div>
+        <div class="mon-stat warn"><div class="v" id="mon-sobre">—</div><div class="l">Personas con ≥ 8 tareas</div></div>
+        <div class="mon-stat"><div class="v" id="mon-libres">—</div><div class="l">Personas libres</div></div>
+      </div>
+    </a>
 
     <div class="footer">Última actualización: <span id="fecha"></span></div>
   </div>
@@ -233,6 +272,23 @@ function showLoggedIn(email) {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
   showScreen('home');
+  cargarMonitoreo();
+}
+
+// Números de la card "Equipo Desarrollo": última sincronización hecha en equipo_desarrollo.html
+function cargarMonitoreo() {
+  try {
+    const r = JSON.parse(localStorage.getItem('equipoResumen') || 'null');
+    if (!r) { document.getElementById('mon-fecha').textContent = 'Entrá al radar para cargar los datos'; return; }
+    document.getElementById('mon-abiertas').textContent = r.abiertas;
+    document.getElementById('mon-vencidas').textContent = r.vencidas;
+    document.getElementById('mon-sobre').textContent = r.sobrecarga;
+    document.getElementById('mon-libres').textContent = r.libres;
+    const d = new Date(r.fecha);
+    document.getElementById('mon-fecha').textContent = 'Datos al ' +
+      d.toLocaleDateString('es-PY', { day: 'numeric', month: 'short' }) + ' · ' +
+      d.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' });
+  } catch (e) {}
 }
 
 async function login() {
