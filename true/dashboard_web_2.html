@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ══════════════════════════════════════════════
+// ⚠️  REEMPLAZÁ ESTOS DOS VALORES
+const SUPABASE_URL = 'https://qszzabybiieolnajaszk.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzenphYnliaWllb2xuYWphc3prIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNjUyMTQsImV4cCI6MjA5NjY0MTIxNH0.8If32to25vLkIvEP0NpaI1T9RDRLp_wP7DrI1Q5yJPA';
+// ══════════════════════════════════════════════
+(async () => {
+  const { createClient } = supabase;
+  const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'index.html'; }
+  else {
+    // Guardar email para barra superior
+    window._userEmail = session.user.email;
+  }
+})();
+</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proyecto Web — Dashboard PM</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f4f3ef; color: #1a1a18; min-height: 100vh; }
+  .container { max-width: 1140px; margin: 0 auto; padding: 2rem 1.5rem; }
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 12px; }
+  .header-left h1 { font-size: 22px; font-weight: 600; color: #2d7a27; }
+  .header-left .subtitle { font-size: 13px; color: #7a7a72; margin-top: 2px; }
+  .back-btn { padding: 8px 16px; border-radius: 8px; border: 1px solid #d0cfc8; background: #fff; font-size: 13px; font-weight: 500; cursor: pointer; color: #3a3a38; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .back-btn:hover { background: #f0efe9; }
+  .nav-btns { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .proj-btn { padding: 9px 18px; border-radius: 8px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: opacity 0.15s; text-decoration: none; }
+  .proj-btn:hover { opacity: 0.85; }
+  .btn-app { background: #2d7a27; color: #fff; }
+  .filter-bar { background: #fff; border: 1px solid #e5e4de; border-radius: 12px; padding: 14px 18px; margin-bottom: 1.5rem; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .filter-label { font-size: 11px; font-weight: 600; color: #7a7a72; text-transform: uppercase; letter-spacing: 0.04em; }
+  .filter-select, .filter-date { background: #f8f7f3; border: 1px solid #d0cfc8; border-radius: 6px; padding: 6px 10px; font-size: 13px; font-family: inherit; color: #1a1a18; cursor: pointer; min-width: 130px; }
+  .filter-actions { display: flex; gap: 8px; margin-left: auto; align-items: flex-end; }
+  .btn-filter { padding: 7px 14px; border-radius: 7px; border: none; background: #2d7a27; color: #fff; font-size: 12px; cursor: pointer; font-family: inherit; }
+  .btn-filter:hover { background: #1e6b18; }
+  .btn-clear { padding: 7px 14px; border-radius: 7px; border: 1px solid #d0cfc8; background: #fff; color: #3a3a38; font-size: 12px; cursor: pointer; font-family: inherit; }
+  .btn-clear:hover { background: #f0efe9; }
+  .active-filters { display: none; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 1rem; }
+  .active-filters.visible { display: flex; }
+  .filter-tag { background: #2d7a27; color: #fff; border-radius: 999px; padding: 3px 12px; font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  .filter-tag button { background: none; border: none; color: #fff; cursor: pointer; font-size: 13px; line-height: 1; padding: 0; }
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
+  .stat { background: #fff; border-radius: 10px; padding: 14px 16px; border: 2px solid transparent; cursor: pointer; transition: border-color 0.15s; user-select: none; }
+  .stat:hover { border-color: #d0cfc8; }
+  .stat.active.s-prog { border-color: #2d7a27; } .stat.active.s-pend { border-color: #8a5200; }
+  .stat.active.s-block { border-color: #a02020; } .stat.active.s-done { border-color: #2d7a27; }
+  .stat-label { font-size: 12px; color: #7a7a72; margin-bottom: 4px; }
+  .stat-num { font-size: 26px; font-weight: 600; }
+  .num-total{color:#2d7a27;} .num-done{color:#2d7a27;} .num-prog{color:#2d7a27;} .num-pend{color:#8a5200;} .num-block{color:#a02020;}
+  .progress-banner { background: #fff; border: 1px solid #e5e4de; border-radius: 12px; padding: 16px 20px; margin-bottom: 1.5rem; }
+  .progress-title { font-size: 13px; font-weight: 600; color: #3a3a38; margin-bottom: 10px; }
+  .progress-track { background: #f0efe9; border-radius: 999px; height: 14px; overflow: hidden; margin-bottom: 6px; }
+  .progress-fill { height: 100%; border-radius: 999px; background: #2d7a27; transition: width 0.5s; }
+  .progress-label { font-size: 13px; color: #5a5a52; }
+  .charts-section { display: grid; grid-template-columns: 280px 1fr; gap: 16px; margin-bottom: 1.75rem; }
+  .chart-card { background: #fff; border: 1px solid #e5e4de; border-radius: 12px; padding: 16px 20px; }
+  .chart-title { font-size: 13px; font-weight: 600; color: #3a3a38; margin-bottom: 12px; }
+  .donut-wrap { position: relative; height: 180px; display: flex; align-items: center; justify-content: center; }
+  .donut-center { position: absolute; text-align: center; pointer-events: none; }
+  .donut-pct { font-size: 26px; font-weight: 700; color: #2d7a27; }
+  .donut-label { font-size: 11px; color: #7a7a72; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #5a5a52; }
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .bars-wrap { display: flex; flex-direction: column; gap: 10px; justify-content: center; height: 100%; }
+  .bar-row { display: flex; align-items: center; gap: 10px; }
+  .bar-name { font-size: 12px; color: #5a5a52; width: 150px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track { flex: 1; background: #f0efe9; border-radius: 999px; height: 10px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 999px; transition: width 0.5s ease; }
+  .bar-pct { font-size: 12px; font-weight: 600; color: #3a3a38; width: 34px; text-align: right; }
+  .project-card { background: #fff; border: 1px solid #e5e4de; border-radius: 12px; margin-bottom: 1rem; overflow: hidden; }
+  .project-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: #eef4fc; cursor: pointer; user-select: none; }
+  .project-header:hover { background: #ddeaf8; }
+  .project-name { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; color: #2d7a27; }
+  .project-meta { font-size: 12px; color: #7a7a72; display: flex; align-items: center; gap: 10px; }
+  .chevron { transition: transform 0.2s; display: inline-block; }
+  .chevron.open { transform: rotate(180deg); }
+  .col-headers { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1.6fr; gap: 8px; padding: 8px 16px; background: #f8f7f3; border-top: 1px solid #e5e4de; font-size: 11px; font-weight: 600; color: #7a7a72; text-transform: uppercase; letter-spacing: 0.04em; }
+  .item-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1.6fr; gap: 8px; align-items: start; padding: 10px 16px; border-top: 1px solid #f0efe9; font-size: 13px; }
+  .item-row:hover { background: #faf9f6; }
+  .item-row.hidden-filter { display: none; }
+  .body-section { display: none; }
+  .body-section.open { display: block; }
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .b-done{background:#e2f0db;color:#1e6b18;} .b-progress{background:#ddeaf8;color:#1053a0;}
+  .b-pending{background:#fdefd4;color:#7a4800;} .b-blocked{background:#fde4e4;color:#941818;}
+  .b-final{background:#d4f0e6;color:#0a5e42;}
+  .text-muted{color:#7a7a72;} .text-italic{font-style:italic;color:#8a8a80;font-size:12px;}
+  .last-updated { font-size: 12px; color: #7a7a72; margin-top: 2rem; text-align: right; }
+  @media (max-width: 700px) {
+    .charts-section { grid-template-columns: 1fr; }
+    .col-headers, .item-row { grid-template-columns: 2fr 1fr 1fr; }
+    .col-headers > *:nth-child(n+4), .item-row > *:nth-child(n+4) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div id="_auth-bar" style="display:flex;align-items:center;justify-content:space-between;padding:8px 24px;background:#fff;border-bottom:1px solid #e5e4de;font-size:13px;color:#7a7a72;position:sticky;top:0;z-index:100;">
+  <span>📋 Dashboard PM &nbsp;·&nbsp; <strong id="_user-email" style="color:#1a1a18"></strong></span>
+  <button onclick="(async()=>{const {createClient}=supabase;const sb=createClient('https://qszzabybiieolnajaszk.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzenphYnliaWllb2xuYWphc3prIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNjUyMTQsImV4cCI6MjA5NjY0MTIxNH0.8If32to25vLkIvEP0NpaI1T9RDRLp_wP7DrI1Q5yJPA');await sb.auth.signOut();window.location.href='index.html';})()" style="padding:5px 14px;border-radius:7px;border:1px solid #d0cfc8;background:#fff;font-size:12px;font-weight:600;cursor:pointer;color:#941818;font-family:inherit;">Cerrar sesión</button>
+</div>
+<script>document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('_user-email');if(el&&window._userEmail)el.textContent=window._userEmail;});</script>
+
+<div class="container">
+  <div class="header">
+    <div class="header-left">
+      <h1>🌐 Proyecto Web</h1>
+      <div class="subtitle" id="dashdate"></div>
+    </div>
+    <div class="nav-btns">
+      <a class="proj-btn btn-app" href="dashboard_app_1.html">📱 Proyecto APP</a>
+      <a class="back-btn" href="index.html">← Volver al Dashboard PM</a>
+    </div>
+  </div>
+
+  <!-- Progress banner -->
+  <div class="progress-banner">
+    <div class="progress-title">Avance general del proyecto Web</div>
+    <div class="progress-track"><div class="progress-fill" id="app-progress-fill" style="width:0%"></div></div>
+    <div class="progress-label" id="app-progress-label">Calculando...</div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <div class="filter-label">Estado</div>
+      <select class="filter-select" id="f-status">
+        <option value="all">Todos los estados</option>
+        <option value="active" selected>Activos</option>
+        <option value="pending">Pendiente</option>
+        <option value="progress">En curso</option>
+        <option value="blocked">Bloqueado</option>
+        <option value="done">Completado</option>
+        <option value="final">Finalizado</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Área</div>
+      <select class="filter-select" id="f-project">
+        <option value="all">Todas las áreas</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Mes de cierre</div>
+      <select class="filter-select" id="f-month">
+        <option value="all">Todos los meses</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Fecha desde</div>
+      <input type="date" class="filter-date" id="f-date-from">
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Fecha hasta</div>
+      <input type="date" class="filter-date" id="f-date-to">
+    </div>
+    <div class="filter-actions">
+      <button class="btn-filter" onclick="applyFilters()">Aplicar</button>
+      <button class="btn-clear" onclick="clearFilters()">Limpiar</button>
+    </div>
+  </div>
+
+  <div class="active-filters" id="active-filters"></div>
+
+  <div class="summary">
+    <div class="stat" onclick="quickFilter('all')"><div class="stat-label">Total ítems</div><div class="stat-num num-total" id="cnt-total">0</div></div>
+    <div class="stat" onclick="quickFilter('done')"><div class="stat-label">Completados</div><div class="stat-num num-done" id="cnt-done">0</div></div>
+    <div class="stat" onclick="quickFilter('progress')"><div class="stat-label">En curso</div><div class="stat-num num-prog" id="cnt-prog">0</div></div>
+    <div class="stat" onclick="quickFilter('pending')"><div class="stat-label">Pendientes</div><div class="stat-num num-pend" id="cnt-pend">0</div></div>
+    <div class="stat" onclick="quickFilter('blocked')"><div class="stat-label">Bloqueados</div><div class="stat-num num-block" id="cnt-block">0</div></div>
+  </div>
+
+  <div class="charts-section">
+    <div class="chart-card">
+      <div class="chart-title">Estado general Web</div>
+      <div class="donut-wrap">
+        <canvas id="donutChart" width="180" height="180" style="max-width:180px;max-height:180px"></canvas>
+        <div class="donut-center"><div class="donut-pct" id="donut-pct">0%</div><div class="donut-label">completado</div></div>
+      </div>
+      <div class="chart-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#2d7a27"></div>Completado</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#2d7a27"></div>En curso</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#c47a00"></div>Pendiente</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#a02020"></div>Bloqueado</div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">% de avance por área</div>
+      <div class="bars-wrap" id="bars-wrap"></div>
+    </div>
+  </div>
+
+  <div id="projects-container"></div>
+  <div class="last-updated" id="last-updated"></div>
+</div>
+
+<script>
+// ─── DATA Web ───
+const projects = [
+  { name:"Pruebas Funcionales", items:[
+    { desc:"Limite Diario — Si la orden es de días anteriores no suma al límite", resp:"Alejandro", status:"pending", deadline:"11/06/2026", closed:"", notes:"Por iniciar" },
+    { desc:"Orden de pago de servicio — No permite cargar la orden, y si autorizo anula", resp:"Hector", status:"pending", deadline:"11/06/2026", closed:"", notes:"Por iniciar" },
+  ]},
+  { name:"QA", items:[
+    { desc:"QA general", resp:"Emilio", status:"pending", deadline:"—", closed:"", notes:"" },
+  ]},
+  { name:"Pentest", items:[
+    { desc:"Pentest", resp:"—", status:"pending", deadline:"—", closed:"", notes:"" },
+  ]},
+  { name:"Implementación", items:[
+    { desc:"Implementación", resp:"—", status:"pending", deadline:"—", closed:"", notes:"" },
+  ]},
+];
+
+const statusMap = { done:{label:"Completado",cls:"b-done"}, progress:{label:"En curso",cls:"b-progress"}, pending:{label:"Pendiente",cls:"b-pending"}, blocked:{label:"Bloqueado",cls:"b-blocked"}, final:{label:"Finalizado",cls:"b-final"} };
+const barColors = ["#2d7a27","#3a9a3a","#206020","#4aaf4a","#155015","#0a400a"];
+let donutChart = null;
+let currentFilters = { status:'active', project:'all', month:'all', dateFrom:'', dateTo:'' };
+
+function parseDate(str) {
+  if(!str||str==='—') return null;
+  const [d,m,y]=str.split('/');
+  if(!d||!m||!y) return null;
+  return new Date(+y,+m-1,+d);
+}
+
+function populateDropdowns() {
+  const projSel=document.getElementById('f-project');
+  projects.forEach(p=>{ const o=document.createElement('option'); o.value=p.name; o.textContent=p.name; projSel.appendChild(o); });
+  const months=new Set();
+  projects.forEach(p=>p.items.forEach(i=>{ const d=parseDate(i.closed)||parseDate(i.deadline); if(d) months.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`); }));
+  const monthSel=document.getElementById('f-month');
+  const mn=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  [...months].sort().forEach(ym=>{ const [y,m]=ym.split('-'); const o=document.createElement('option'); o.value=ym; o.textContent=`${mn[+m-1]} ${y}`; monthSel.appendChild(o); });
+}
+
+function itemMatches(item,projName) {
+  const {status,project,month,dateFrom,dateTo}=currentFilters;
+  if(project!=='all'&&projName!==project) return false;
+  if(status==='active'){if(!['pending','progress','blocked'].includes(item.status)) return false;}
+  else if(status!=='all'&&item.status!==status) return false;
+  const refDate=parseDate(item.closed)||parseDate(item.deadline);
+  if(month!=='all'){if(!refDate) return false; const ym=`${refDate.getFullYear()}-${String(refDate.getMonth()+1).padStart(2,'0')}`; if(ym!==month) return false;}
+  if(dateFrom){const from=new Date(dateFrom); if(!refDate||refDate<from) return false;}
+  if(dateTo){const to=new Date(dateTo); if(!refDate||refDate>to) return false;}
+  return true;
+}
+
+function applyFilters() {
+  currentFilters={status:document.getElementById('f-status').value,project:document.getElementById('f-project').value,month:document.getElementById('f-month').value,dateFrom:document.getElementById('f-date-from').value,dateTo:document.getElementById('f-date-to').value};
+  renderActiveFilterTags(); render();
+}
+
+function clearFilters() {
+  currentFilters={status:'all',project:'all',month:'all',dateFrom:'',dateTo:''};
+  ['f-status','f-project','f-month'].forEach(id=>document.getElementById(id).value=(id==='f-status'?'all':'all'));
+  document.getElementById('f-date-from').value=''; document.getElementById('f-date-to').value='';
+  renderActiveFilterTags(); render();
+}
+
+function quickFilter(status) {
+  document.getElementById('f-status').value=status; currentFilters.status=status;
+  renderActiveFilterTags(); render();
+}
+
+function renderActiveFilterTags() {
+  const wrap=document.getElementById('active-filters'); wrap.innerHTML='';
+  const {status,project,month,dateFrom,dateTo}=currentFilters;
+  const mn=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const tags=[];
+  if(status!=='all') tags.push({label:document.getElementById('f-status').options[document.getElementById('f-status').selectedIndex].text,clear:()=>{document.getElementById('f-status').value='all';currentFilters.status='all';}});
+  if(project!=='all') tags.push({label:`Área: ${project}`,clear:()=>{document.getElementById('f-project').value='all';currentFilters.project='all';}});
+  if(month!=='all'){const[y,m]=month.split('-');tags.push({label:`${mn[+m-1]} ${y}`,clear:()=>{document.getElementById('f-month').value='all';currentFilters.month='all';}});}
+  if(dateFrom) tags.push({label:`Desde: ${dateFrom}`,clear:()=>{document.getElementById('f-date-from').value='';currentFilters.dateFrom='';}});
+  if(dateTo) tags.push({label:`Hasta: ${dateTo}`,clear:()=>{document.getElementById('f-date-to').value='';currentFilters.dateTo='';}});
+  if(!tags.length){wrap.classList.remove('visible');return;}
+  wrap.classList.add('visible');
+  tags.forEach(t=>{const tag=document.createElement('div');tag.className='filter-tag';tag.innerHTML=`${t.label} <button onclick="(${t.clear.toString()})();renderActiveFilterTags();render();">✕</button>`;wrap.appendChild(tag);});
+  const ca=document.createElement('button');ca.className='btn-clear';ca.style.cssText='font-size:12px;padding:3px 10px;border-radius:999px;';ca.textContent='Limpiar todo';ca.onclick=clearFilters;wrap.appendChild(ca);
+}
+
+function updateCharts(vis) {
+  let done=0,prog=0,pend=0,block=0,total=0;
+  vis.forEach(i=>{total++;if(i.status==='done'||i.status==='final')done++;else if(i.status==='progress')prog++;else if(i.status==='pending')pend++;else if(i.status==='blocked')block++;});
+  const pct=total?Math.round(done/total*100):0;
+  document.getElementById('donut-pct').textContent=pct+'%';
+  document.getElementById('app-progress-fill').style.width=pct+'%';
+  const allItems=projects.flatMap(p=>p.items);
+  const totalAll=allItems.length, doneAll=allItems.filter(i=>i.status==='done'||i.status==='final').length;
+  const pctAll=totalAll?Math.round(doneAll/totalAll*100):0;
+  document.getElementById('app-progress-fill').style.width=pctAll+'%';
+  document.getElementById('app-progress-label').textContent=`${doneAll} de ${totalAll} ítems completados (${pctAll}%)`;
+  const data=[done,prog,pend,block],colors=['#2d7a27','#2d7a27','#c47a00','#a02020'];
+  if(donutChart){donutChart.data.datasets[0].data=data;donutChart.update();}
+  else{donutChart=new Chart(document.getElementById('donutChart').getContext('2d'),{type:'doughnut',data:{labels:['Completado','En curso','Pendiente','Bloqueado'],datasets:[{data,backgroundColor:colors,borderWidth:0,hoverOffset:4}]},options:{cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${c.raw}`}}},animation:{duration:400}}});}
+  document.getElementById('bars-wrap').innerHTML=projects.map((p,i)=>{
+    const f=p.items.filter(it=>itemMatches(it,p.name));if(!f.length)return'';
+    const pct=Math.round(f.filter(it=>it.status==='done'||it.status==='final').length/f.length*100);
+    return`<div class="bar-row"><div class="bar-name" title="${p.name}">${p.name}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${barColors[i%barColors.length]}"></div></div><div class="bar-pct">${pct}%</div></div>`;
+  }).join('');
+}
+
+function render() {
+  const container=document.getElementById('projects-container');container.innerHTML='';
+  let total=0,done=0,prog=0,pend=0,block=0,allVis=[];
+  projects.forEach(proj=>{
+    const vis=proj.items.filter(i=>itemMatches(i,proj.name));if(!vis.length)return;
+    allVis.push(...vis);
+    vis.forEach(i=>{total++;if(i.status==='done'||i.status==='final')done++;else if(i.status==='progress')prog++;else if(i.status==='pending')pend++;else if(i.status==='blocked')block++;});
+    const pct=Math.round(vis.filter(i=>i.status==='done'||i.status==='final').length/vis.length*100);
+    const sid=proj.name.replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
+    const card=document.createElement('div');card.className='project-card';
+    card.innerHTML=`<div class="project-header" onclick="toggleProject('${sid}')"><div class="project-name">📦 ${proj.name}</div><div class="project-meta"><span style="font-weight:600;color:${pct===100?'#2d7a27':'#2d7a27'}">${pct}%</span><span>${vis.length} ítem${vis.length!==1?'s':''}</span><span class="chevron open" id="chev-${sid}">▼</span></div></div>
+    <div class="body-section open" id="body-${sid}"><div class="col-headers"><span>Descripción</span><span>Responsable</span><span>Estado</span><span>Fecha límite</span><span>Fecha cierre</span><span>Notas</span></div>${vis.map(item=>`<div class="item-row" data-status="${item.status}"><span>${item.desc}</span><span class="text-muted">${item.resp||'—'}</span><span><span class="badge ${statusMap[item.status].cls}">${statusMap[item.status].label}</span></span><span class="text-muted">${item.deadline||'—'}</span><span class="text-muted">${item.closed||'—'}</span><span class="text-italic">${item.notes||'—'}</span></div>`).join('')}</div>`;
+    container.appendChild(card);
+  });
+  document.getElementById('cnt-total').textContent=total;document.getElementById('cnt-done').textContent=done;document.getElementById('cnt-prog').textContent=prog;document.getElementById('cnt-pend').textContent=pend;document.getElementById('cnt-block').textContent=block;
+  document.getElementById('last-updated').textContent='Última actualización: '+new Date().toLocaleString('es-PY');
+  updateCharts(allVis);
+}
+
+function toggleProject(id){const b=document.getElementById('body-'+id),c=document.getElementById('chev-'+id);const o=b.classList.contains('open');b.classList.toggle('open',!o);c.classList.toggle('open',!o);}
+
+document.getElementById('dashdate').textContent=new Date().toLocaleDateString('es-PY',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+populateDropdowns(); render();
+</script>
+</body>
+</html>

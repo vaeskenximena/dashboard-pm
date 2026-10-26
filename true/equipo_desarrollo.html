@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Equipo Desarrollo · Dashboard PM</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F4F3EF; --surface:#FFFFFF; --surface-2:#F1EFEA; --border:#E7E4DD;
+    --text:#1D1C1A; --muted:#6F6B63; --faint:#A39E94;
+    --app:#1A56A6; --app-soft:#E3ECF8;
+    --web:#2E7D32; --web-soft:#E4F2E5;
+    --prod:#8A3FF0; --inc:#9B1B1B;
+    --team:#0E7C78; --team-soft:#DCF0EE;
+    --late:#B42318; --late-soft:#FCE6E3;
+    --warn:#B76E00; --warn-soft:#FBEFD8;
+    --ok:#2E7D32; --ok-soft:#E4F2E5;
+    --s-todo:#D6CFC1; --s-prog:#1A56A6; --s-rev:#8A3FF0; --s-pause:#8FB0E0; --s-test:#D9912A; --s-done:#2E7D32;
+    --shadow:0 1px 2px rgba(30,25,15,.04), 0 12px 30px -20px rgba(30,25,15,.22);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{background:var(--bg); color:var(--text); font-family:"Nunito Sans", system-ui, sans-serif; -webkit-font-smoothing:antialiased;}
+  button{font-family:inherit; color:inherit;}
+  a{color:inherit;}
+  .num{font-variant-numeric:tabular-nums;}
+  [hidden]{display:none !important;}
+
+  /* Top bar */
+  .topbar{background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 20px; flex-wrap:wrap;}
+  .user{display:flex; align-items:center; gap:8px; font-weight:700; font-size:.95rem;}
+  .topbar-right{display:flex; align-items:center; gap:10px;}
+  .preview-tag{font-size:.72rem; font-weight:800; letter-spacing:.05em; color:var(--warn); background:var(--warn-soft); border-radius:999px; padding:5px 11px;}
+  .logout{background:none; border:1px solid var(--border); border-radius:10px; padding:8px 16px; color:var(--inc); font-weight:700; cursor:pointer;}
+
+  .wrap{max-width:1180px; margin:0 auto; padding:0 16px;}
+
+  /* ============ HOME ============ */
+  .hero{text-align:center; padding:72px 0 40px;}
+  .eyebrow{font-size:.85rem; font-weight:800; letter-spacing:.12em; color:var(--muted);}
+  .hero h1{font-size:2.6rem; font-weight:800; margin:14px 0 10px; letter-spacing:-.01em;}
+  .hero p{color:var(--muted); font-size:1.12rem; margin:0;}
+  .group-label{font-size:.74rem; font-weight:800; letter-spacing:.12em; color:var(--faint); margin:0 0 12px 4px;}
+  .cards{display:grid; grid-template-columns:repeat(4,1fr); gap:24px; margin-bottom:36px;}
+  .pcard{background:var(--surface); border-radius:20px; border-top:5px solid var(--c); padding:34px 34px 30px; box-shadow:var(--shadow); text-decoration:none; display:flex; flex-direction:column; transition:transform .15s, box-shadow .15s;}
+  .pcard:hover{transform:translateY(-2px);}
+  .pcard .ico{font-size:2.3rem; line-height:1; margin-bottom:22px;}
+  .pcard h3{font-size:1.45rem; font-weight:800; margin:0 0 14px;}
+  .pcard p{color:var(--muted); font-size:1.02rem; line-height:1.55; margin:0 0 22px; flex:1;}
+  .pcard .go{color:var(--c); font-weight:800; font-size:1.05rem;}
+
+  .mcard{display:grid; grid-template-columns:1.2fr 2fr; gap:28px; align-items:center; background:var(--surface); border-radius:20px; border-left:6px solid var(--team); padding:28px 32px; box-shadow:var(--shadow); text-decoration:none; transition:transform .15s;}
+  .mcard:hover{transform:translateY(-2px);}
+  .mcard .ico{font-size:2.1rem; margin-bottom:10px;}
+  .mcard h3{font-size:1.45rem; font-weight:800; margin:0 0 8px;}
+  .mcard p{color:var(--muted); margin:0 0 14px; line-height:1.5;}
+  .mcard .go{color:var(--team); font-weight:800;}
+  .mstats{display:grid; grid-template-columns:repeat(4,1fr); gap:12px;}
+  .mstat{background:var(--surface-2); border-radius:14px; padding:14px 16px;}
+  .mstat .v{font-size:1.9rem; font-weight:800; line-height:1;}
+  .mstat .l{font-size:.78rem; color:var(--muted); font-weight:600; margin-top:6px;}
+  .mstat.late .v{color:var(--late);} .mstat.warn .v{color:var(--warn);}
+  .updated{text-align:center; color:var(--faint); padding:44px 0 56px; font-size:.95rem;}
+
+  /* ============ RADAR ============ */
+  .r-head{display:flex; flex-wrap:wrap; gap:16px; justify-content:space-between; align-items:flex-end; padding:28px 0 22px;}
+  .back{display:inline-block; text-decoration:none; color:var(--muted); font-weight:700; font-size:.9rem; margin-bottom:10px;}
+  .back:hover{color:var(--text);}
+  .r-head h1{font-size:1.75rem; font-weight:800; margin:0;}
+  .r-head .sub{color:var(--muted); margin-top:4px;}
+  .sync-box{display:flex; align-items:center; gap:14px; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:10px 10px 10px 16px; box-shadow:var(--shadow);}
+  .sync-meta{font-size:.76rem; color:var(--muted); line-height:1.35;}
+  .sync-meta b{color:var(--text); font-size:.86rem;}
+  .sync-btn{display:flex; align-items:center; gap:8px; background:var(--team); color:#fff; border:none; border-radius:10px; padding:10px 16px; font-weight:800; font-size:.9rem; cursor:pointer;}
+  .sync-btn:disabled{opacity:.75; cursor:progress;}
+  .sync-btn .spin{display:inline-block;}
+  .sync-btn.loading .spin{animation:spin 0.9s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .kpis{display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:18px;}
+  .kpi{background:var(--surface); border:1.5px solid var(--border); border-radius:14px; padding:14px 16px; text-align:left; cursor:pointer; box-shadow:var(--shadow); transition:border-color .15s;}
+  .kpi:hover{border-color:var(--faint);}
+  .kpi.active{border-color:var(--text);}
+  .kpi .label{font-size:.72rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--muted);}
+  .kpi .value{font-size:2rem; font-weight:800; line-height:1.1; margin-top:6px;}
+  .kpi .sub{font-size:.76rem; color:var(--faint);}
+  .kpi.web .value{color:var(--web);} .kpi.dig .value{color:var(--app);} .kpi.late .value{color:var(--late);} .kpi.free .value{color:var(--ok);}
+
+  .filter-note{display:flex; align-items:center; gap:10px; font-size:.84rem; color:var(--muted); margin:-4px 0 14px;}
+  .filter-note button{background:none; border:none; color:var(--team); font-weight:800; cursor:pointer; padding:0;}
+
+  section{margin-bottom:28px;}
+  .section-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap:wrap;}
+  .section-head h2{font-size:1.1rem; font-weight:800; margin:0;}
+  .hint{font-size:.78rem; color:var(--faint);}
+
+  .team-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px;}
+  .card{background:var(--surface); border:1.5px solid var(--border); border-radius:16px; padding:16px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:11px; text-align:left; cursor:pointer; transition:border-color .15s, transform .15s;}
+  .card:hover{border-color:var(--team); transform:translateY(-1px);}
+  .card-head{display:flex; justify-content:space-between; gap:8px; align-items:flex-start;}
+  .name{font-weight:800; font-size:1.02rem;}
+  .fullname{font-size:.74rem; color:var(--faint); margin-top:1px;}
+  .load-badge{font-weight:800; font-size:.95rem; border-radius:10px; padding:3px 10px;}
+  .load-badge.high{background:var(--late-soft); color:var(--late);}
+  .load-badge.mid{background:var(--warn-soft); color:var(--warn);}
+  .load-badge.low{background:var(--surface-2); color:var(--muted);}
+  .proj-row{display:flex; gap:8px; align-items:flex-start;}
+  .tag{font-size:.68rem; font-weight:800; letter-spacing:.03em; border-radius:6px; padding:3px 6px; min-width:36px; text-align:center; flex-shrink:0;}
+  .tag.web{background:var(--web-soft); color:var(--web);}
+  .tag.dig{background:var(--app-soft); color:var(--app);}
+  .chips{display:flex; flex-wrap:wrap; gap:5px;}
+  .chip{font-size:.74rem; font-weight:600; color:var(--muted); background:var(--surface-2); border-radius:7px; padding:3px 8px; white-space:nowrap;}
+  .chip b{color:var(--text);}
+  .chip-empty{font-size:.74rem; color:var(--faint);}
+  .card-foot{display:flex; justify-content:space-between; align-items:center; gap:8px; border-top:1px dashed var(--border); padding-top:10px; font-size:.78rem; flex-wrap:wrap;}
+  .late-pill{background:var(--late-soft); color:var(--late); font-weight:800; border-radius:999px; padding:3px 10px;}
+  .ok-pill{background:var(--ok-soft); color:var(--ok); font-weight:700; border-radius:999px; padding:3px 10px;}
+  .stale{color:var(--muted); display:flex; align-items:center; gap:6px;}
+  .dot{width:8px; height:8px; border-radius:50%; display:inline-block;}
+  .dot.fresh{background:var(--ok);} .dot.warm{background:var(--warn);} .dot.stale{background:var(--late);}
+  .empty-grid{grid-column:1/-1; background:var(--surface-2); border-radius:14px; padding:22px; text-align:center; color:var(--muted);}
+
+  .dist-card{background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:18px 20px; box-shadow:var(--shadow);}
+  .dist-row{display:grid; grid-template-columns:170px 1fr 34px; gap:10px; align-items:center; padding:5px 0;}
+  .dist-row .lbl{font-size:.83rem; color:var(--muted); display:flex; align-items:center; gap:7px;}
+  .sw{width:9px; height:9px; border-radius:2px;}
+  .sw.web{background:var(--web);} .sw.dig{background:var(--app);}
+  .track{background:var(--surface-2); border-radius:5px; height:10px; overflow:hidden;}
+  .fill{height:100%; border-radius:5px;}
+  .fill.web{background:var(--web);} .fill.dig{background:var(--app);}
+  .cnt{font-size:.83rem; font-weight:800; text-align:right;}
+  footer{font-size:.76rem; color:var(--faint); padding-bottom:40px;}
+
+  /* ============ DRAWER ============ */
+  .drawer-bg{position:fixed; inset:0; background:rgba(25,22,18,.35); display:flex; justify-content:flex-end; z-index:50;}
+  .drawer{background:var(--bg); width:min(620px,100%); height:100%; overflow-y:auto; box-shadow:-20px 0 40px -20px rgba(0,0,0,.3); animation:slide .22s ease-out;}
+  @keyframes slide{from{transform:translateX(40px); opacity:.4;}}
+  .d-head{position:sticky; top:0; background:var(--surface); border-bottom:1px solid var(--border); padding:18px 22px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; z-index:2;}
+  .d-head h2{margin:0; font-size:1.4rem; font-weight:800;}
+  .d-head .fullname{font-size:.82rem;}
+  .close{background:var(--surface-2); border:none; width:36px; height:36px; border-radius:10px; font-size:1.2rem; cursor:pointer; flex-shrink:0;}
+  .d-body{padding:18px 22px 40px; display:flex; flex-direction:column; gap:18px;}
+  .d-stats{display:grid; grid-template-columns:repeat(4,1fr); gap:10px;}
+  .d-stat{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px 14px;}
+  .d-stat .v{font-size:1.6rem; font-weight:800; line-height:1.1;}
+  .d-stat .l{font-size:.74rem; color:var(--muted); font-weight:600;}
+  .d-stat.late .v{color:var(--late);} .d-stat.pause .v{color:#3E6BB0;} .d-stat.done .v{color:var(--ok);}
+  .panel{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px;}
+  .panel h3{margin:0 0 4px; font-size:1rem; font-weight:800; display:flex; align-items:center; gap:8px;}
+  .panel .hint{margin-bottom:12px; display:block;}
+  .count-badge{font-size:.78rem; background:var(--late-soft); color:var(--late); border-radius:999px; padding:2px 9px;}
+  .row-list{display:flex; flex-direction:column;}
+  .trow{display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; padding:9px 0; border-top:1px solid var(--surface-2);}
+  .trow:first-child{border-top:none;}
+  .t-title{font-size:.88rem; font-weight:600; line-height:1.3;}
+  .t-meta{font-size:.76rem; color:var(--muted); margin-top:2px;}
+  .t-days{font-size:.8rem; font-weight:800; color:var(--late); white-space:nowrap; text-align:right;}
+  .t-days.future{color:var(--muted); font-weight:600;}
+  .ok-box{background:var(--ok-soft); color:var(--ok); border-radius:10px; padding:12px 14px; font-weight:700; font-size:.88rem;}
+
+  .seg{display:inline-flex; background:var(--surface-2); border-radius:10px; padding:3px; margin-bottom:14px;}
+  .seg button{border:none; background:none; padding:6px 12px; border-radius:8px; font-size:.8rem; font-weight:700; color:var(--muted); cursor:pointer;}
+  .seg button.on{background:var(--surface); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  .chart{display:grid; grid-template-columns:repeat(6,1fr); gap:10px; align-items:end; height:240px; padding-top:18px;}
+  .col{display:flex; flex-direction:column; align-items:center; height:100%; justify-content:flex-end; gap:6px;}
+  .col .tot{font-size:.72rem; font-weight:600; color:var(--faint); margin-top:-4px;}
+  .pct{font-size:.9rem; font-weight:800;}
+  .pct.hi, .perf-v.hi{color:var(--ok);} .pct.mid, .perf-v.mid{color:var(--warn);} .pct.lo, .perf-v.lo{color:var(--late);} .pct.na, .perf-v.na{color:var(--faint);}
+  .perf{display:grid; grid-template-columns:auto 1fr; gap:4px 14px; align-items:center; background:var(--surface-2); border-radius:12px; padding:12px 14px; margin-bottom:6px;}
+  .perf-v{font-size:1.8rem; font-weight:800; line-height:1; grid-row:span 2;}
+  .perf-t{font-size:.8rem; color:var(--muted); line-height:1.35;}
+  .perf-t b{color:var(--text);}
+  .perf-bar{height:6px; background:var(--border); border-radius:4px; overflow:hidden;}
+  .perf-bar div{height:100%; border-radius:4px;}
+  .perf-bar .hi{background:var(--ok);} .perf-bar .mid{background:var(--warn);} .perf-bar .lo{background:var(--late);}
+  .stack{width:min(46px,80%); display:flex; flex-direction:column-reverse; border-radius:7px; overflow:hidden; background:var(--surface-2); min-height:3px;}
+  .seg-bar{width:100%;}
+  .col .m{font-size:.78rem; color:var(--muted); font-weight:700;}
+  .col .m.now{color:var(--text);}
+  .legend{display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:14px; font-size:.78rem; color:var(--muted);}
+  .legend span{display:flex; align-items:center; gap:6px;}
+  .legend i{width:10px; height:10px; border-radius:3px; display:inline-block;}
+  .chart-note{font-size:.78rem; color:var(--muted); background:var(--surface-2); border-radius:8px; padding:8px 10px; margin-top:12px;}
+  .st-chip{font-size:.72rem; font-weight:700; border-radius:6px; padding:2px 7px; background:var(--surface-2); color:var(--muted);}
+
+  .sync-banner{background:var(--warn-soft); color:var(--warn); border-radius:12px; padding:10px 14px; font-size:.85rem; font-weight:600; margin:-6px 0 16px;}
+  .toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--text); color:#fff; padding:11px 18px; border-radius:12px; font-size:.88rem; font-weight:600; box-shadow:0 10px 30px rgba(0,0,0,.25); z-index:80; max-width:calc(100% - 32px); opacity:0; pointer-events:none; transition:opacity .2s;}
+  .toast.show{opacity:1;}
+
+  @media (max-width:980px){
+    .cards{grid-template-columns:repeat(2,1fr);}
+    .mcard{grid-template-columns:1fr;}
+    .kpis{grid-template-columns:repeat(3,1fr);}
+  }
+  @media (max-width:600px){
+    .hero{padding:40px 0 28px;} .hero h1{font-size:2rem;}
+    .cards{grid-template-columns:1fr;}
+    .mstats{grid-template-columns:repeat(2,1fr);}
+    .kpis{grid-template-columns:repeat(2,1fr);}
+    .d-stats{grid-template-columns:repeat(2,1fr);}
+    .dist-row{grid-template-columns:120px 1fr 30px;}
+    .sync-box{width:100%; justify-content:space-between;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="user">👤 <span id="userEmail"></span></div>
+  <div class="topbar-right">
+        <button class="logout" type="button" id="logoutBtn">Cerrar sesión</button>
+  </div>
+</div>
+
+<!-- ================= RADAR ================= -->
+<main id="viewEquipo" class="wrap">
+  <div class="r-head">
+    <div>
+      <a class="back" href="index.html">← Dashboard PM</a>
+      <h1>👥 Equipo Desarrollo</h1>
+      <div class="sub">Radar de disponibilidad y carga · Jira WEB + DIG</div>
+    </div>
+    <div class="sync-box">
+      <div class="sync-meta">Última sincronización<br><b id="syncWhen">—</b></div>
+      <button class="sync-btn" id="syncBtn" type="button"><span class="spin">⟳</span> Sincronizar Jira</button>
+    </div>
+  </div>
+
+  <div class="sync-banner" id="syncBanner" hidden></div>
+
+  <div class="kpis" id="kpis">
+    <button class="kpi" data-f="todos" type="button"><div class="label">Tareas abiertas</div><div class="value num" id="kTotal">—</div><div class="sub">todo el equipo</div></button>
+    <button class="kpi web" data-f="web" type="button"><div class="label">WEB</div><div class="value num" id="kWeb">—</div><div class="sub">tareas abiertas</div></button>
+    <button class="kpi dig" data-f="dig" type="button"><div class="label">DIG (APP)</div><div class="value num" id="kDig">—</div><div class="sub">tareas abiertas</div></button>
+    <button class="kpi late" data-f="vencidas" type="button"><div class="label">Vencidas</div><div class="value num" id="kLate">—</div><div class="sub" id="kLateSub">—</div></button>
+    <button class="kpi free" data-f="libres" type="button"><div class="label">Libres</div><div class="value num" id="kFree">—</div><div class="sub" id="kFreeSub">—</div></button>
+  </div>
+  <div class="filter-note" id="filterNote" hidden></div>
+
+  <section>
+    <div class="section-head">
+      <h2>Carga por persona</h2>
+      <div class="hint">Tocá una persona para ver vencidas y evolución por mes · punto = antigüedad de su tarea abierta más vieja</div>
+    </div>
+    <div class="team-grid" id="teamGrid"></div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Distribución del equipo por estado</h2>
+      <div class="hint" id="distHint"></div>
+    </div>
+    <div class="dist-card" id="distCard"></div>
+  </section>
+
+  <footer>Estados de fin (salida a producción): Finalizado, Beta, Publicado, Implementado Prod — no cuentan como carga activa. "Finalizada tarea" (cierre sin implementación) no cuenta como carga ni entra en el rendimiento. Vencida = tarea abierta con fecha de vencimiento anterior a hoy.<br><span id="footExtra"></span></footer>
+</main>
+
+<!-- ================= DRAWER ================= -->
+<div class="drawer-bg" id="drawerBg" hidden>
+  <aside class="drawer" id="drawer" role="dialog" aria-modal="true"></aside>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =====================================================================
+   CONFIGURACIÓN
+   Usa la MISMA función que los demás dashboards (jira-sync).
+   El JQL se define en Supabase (tabla jira_config): debe incluir WEB y DIG,
+   por ejemplo: project in (DIG, UXUI, IB, WEB)
+   ===================================================================== */
+const CONFIG = {
+  ENDPOINT: '/.netlify/functions/jira-sync',
+  PROYECTOS: ['DIG', 'WEB']
+};
+
+const TEAM = [
+  ['Camila','Camila Montserrat Alderete González'], ['Koichi','Koichi Nagasawa'],
+  ['Gaston','Gastón Romero'], ['Samuel','Samuel Lin Liu'],
+  ['Federico','Federico Ñamandu Verón Alvarez'], ['Luis','Luis Meza'],
+  ['Jacqueline','Jacqueline Gill'], ['Braian','Braian Bernatto'],
+  ['Hector','Héctor Barral'], ['Bruno','Bruno Lird'],
+  ['Alejandro','Alejandro Martinez'], ['Antonella','Antonella Miho Lucero Alarcón'],
+  ['Juan Martin','Juan Ovelar'], ['Moises','Edgardo Moisés Silva Ovando'],
+  ['Juan','Juan Emanuel Méndez'], ['Pablo','Pablo Cesar Acosta']
+];
+/* Estados según el flujo de Jira. Se normalizan (mayúsculas, tildes y variantes). */
+const CANON = {
+  'backlog':'Backlog', 'por hacer':'Por hacer',
+  'en progreso':'En progreso', 'en curso':'En curso', 'en pausa':'En pausa',
+  'pend revision':'Pend. revisión', 'pent revision':'Pend. revisión', 'pendiente revision':'Pend. revisión', 'pend. revision':'Pend. revisión',
+  'revision':'Revisión', 'en revision':'Revisión',
+  'pend prueba':'Pend. prueba', 'pend. prueba':'Pend. prueba', 'pendiente prueba':'Pend. prueba',
+  'prueba':'Prueba', 'control de calidad':'Control de calidad',
+  'finalizado':'Finalizado', 'beta':'Beta', 'publicado':'Publicado',
+  'implementado prod':'Implementado Prod', 'implementado en prod':'Implementado Prod',
+  'finalizada tarea':'Finalizada tarea'
+};
+const canon = s => CANON[norm(s).replace(/\s+/g,' ')] || String(s||'').trim();
+const DONE = new Set(['Finalizado','Beta','Publicado','Implementado Prod']);        // verdes = estados de fin
+const CERRADA_SIN_IMPL = new Set(['Finalizada tarea']);                              // transversal
+const ORDER = ['Backlog','Por hacer','En progreso','En curso','En pausa','Pend. revisión','Revisión','Pend. prueba','Prueba','Control de calidad'];
+const WEB_ORDER = ORDER, DIG_ORDER = ORDER;
+const FIN = 'Salida a producción';
+const GRUPOS = [
+  {k:'Planificación', c:'var(--s-todo)'}, {k:'Desarrollo', c:'var(--s-prog)'},
+  {k:'En pausa', c:'var(--s-pause)'}, {k:'Revisión de código', c:'var(--s-rev)'},
+  {k:'Pruebas funcionales', c:'var(--s-test)'}, {k:FIN, c:'var(--s-done)'}
+];
+const GRUPO_DE = {'Backlog':'Planificación','Por hacer':'Planificación','En progreso':'Desarrollo','En curso':'Desarrollo','En pausa':'En pausa',
+  'Pend. revisión':'Revisión de código','Revisión':'Revisión de código','Pend. prueba':'Pruebas funcionales','Prueba':'Pruebas funcionales','Control de calidad':'Pruebas funcionales'};
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const MESES_L = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+/* ---------- utilidades ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+const NAME_MAP = Object.fromEntries(TEAM.map(([s,f]) => [norm(f), s]));
+// Personas que no forman parte del radar: se ignoran por completo (ni carga ni aviso al pie)
+const IGNORAR = new Set(['Pedro Duarte','Martin Jara','Diana Nayeli Ovelar Gonzalez','Luis Mauricio Mendieta'].map(norm));
+const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const addDays = (d,n) => new Date(d.getFullYear(), d.getMonth(), d.getDate()+n);
+const diffDays = (a,b) => Math.round((startOfDay(b)-startOfDay(a))/86400000);
+const dayOf = s => s ? new Date(String(s).slice(0,10)+'T00:00:00') : null;
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const ym = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+const fmtDay = d => `${d.getDate()} ${MESES[d.getMonth()]}`;
+const fmtDateTime = d => `${d.getDate()} ${MESES[d.getMonth()]} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+const grupo = t => t.done ? FIN : (GRUPO_DE[t.estado] || 'Planificación');
+
+let toastT;
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),3200); }
+
+/* =====================================================================
+   MODELO — transforma issues de Jira en datos por persona
+   ===================================================================== */
+function construirModelo(issues){
+  const hoy = startOfDay(new Date());
+  const P = {};
+  TEAM.forEach(([s,f]) => P[s] = {short:s, full:f, abiertas:[], cerradas:[], vencidas:[], web:{}, dig:{}});
+  const fuera = {}; let sinAsignar = 0, sinImpl = 0;
+  issues.forEach(is => {
+    const f = is.fields || {};
+    const nombre = f.assignee && f.assignee.displayName;
+    const estadoC = canon(f.status && f.status.name);
+    const abierta = !DONE.has(estadoC) && !CERRADA_SIN_IMPL.has(estadoC);
+    const short = NAME_MAP[norm(nombre)];
+    if(!short){
+      if(abierta && !IGNORAR.has(norm(nombre))){ if(!nombre) sinAsignar++; else fuera[nombre] = (fuera[nombre]||0) + 1; }
+      return;
+    }
+    if(CERRADA_SIN_IMPL.has(estadoC)){ sinImpl++; return; }
+    const t = {
+      key: is.key, titulo: f.summary || '', estado: estadoC,
+      proyecto: (f.project && f.project.key) || String(is.key).split('-')[0],
+      creada: dayOf(f.created), actualizada: dayOf(f.updated),
+      vence: dayOf(f.duedate), resuelta: dayOf(f.resolutiondate)
+    };
+    t.done = DONE.has(t.estado);
+    const p = P[short];
+    if(t.done){ p.cerradas.push(t); return; }
+    p.abiertas.push(t);
+    const bucket = t.proyecto === 'WEB' ? p.web : p.dig;
+    bucket[t.estado] = (bucket[t.estado]||0) + 1;
+    if(t.vence && t.vence < hoy){ t.atraso = diffDays(t.vence, hoy); p.vencidas.push(t); }
+  });
+  const res = {total:0, web:0, dig:0, vencidas:0, conVencidas:0, libres:[], sobrecarga:0, dist:{}, fuera, sinAsignar, sinImpl};
+  Object.values(P).forEach(p => {
+    p.total = p.abiertas.length;
+    p.webTotal = p.abiertas.filter(t=>t.proyecto==='WEB').length;
+    p.digTotal = p.total - p.webTotal;
+    p.vencidas.sort((a,b) => b.atraso - a.atraso);
+    p.masVieja = p.abiertas.slice().sort((a,b)=>a.actualizada-b.actualizada)[0] || null;
+    res.total += p.total; res.web += p.webTotal; res.dig += p.digTotal;
+    res.vencidas += p.vencidas.length; if(p.vencidas.length) res.conVencidas++;
+    if(p.total === 0) res.libres.push(p.short);
+    if(p.total >= 8) res.sobrecarga++;
+    p.abiertas.forEach(t => { const k = `${t.proyecto==='WEB'?'WEB':'DIG'}|${t.estado}`; res.dist[k]=(res.dist[k]||0)+1; });
+  });
+  return {personas:P, resumen:res};
+}
+
+/* =====================================================================
+   SINCRONIZACIÓN
+   ===================================================================== */
+let MODEL = null, LAST_SYNC = null, FILTRO = 'todos', CHART_MODO = 'creacion', OPEN_P = null;
+
+async function sincronizar(silencioso){
+  const btn = $('syncBtn');
+  const banner = $('syncBanner');
+  btn.disabled = true; btn.classList.add('loading');
+  try{
+    const r = await fetch(CONFIG.ENDPOINT);
+    const raw = await r.text();
+    let j;
+    try{ j = JSON.parse(raw); }catch(_){ throw new Error('respuesta inesperada del servidor (HTTP ' + r.status + ')'); }
+    if(!r.ok || j.error) throw new Error((j.error || 'error al sincronizar') + ' (HTTP ' + r.status + ')');
+
+    const issues = (j.issues || []).filter(i => CONFIG.PROYECTOS.includes(String(i.key).split('-')[0]));
+    if(!issues.length) throw new Error('no llegaron tareas de DIG ni WEB — revisá el JQL en Supabase');
+
+    const faltan = CONFIG.PROYECTOS.filter(p => !issues.some(i => String(i.key).startsWith(p + '-')));
+    if(faltan.length){
+      banner.hidden = false;
+      banner.textContent = `⚠ No llegaron tareas de ${faltan.join(' y ')}. Agregá ${faltan.join(', ')} al JQL en Supabase, por ejemplo: project in (DIG, UXUI, IB, WEB).`;
+    } else banner.hidden = true;
+
+    MODEL = construirModelo(issues);
+    LAST_SYNC = new Date();
+    guardarResumen();
+    renderTodo();
+    if(OPEN_P) abrirPersona(OPEN_P);
+    if(!silencioso) toast('✓ Sincronizado con Jira');
+  }catch(e){
+    banner.hidden = false;
+    banner.textContent = '⚠ No se pudo sincronizar con Jira: ' + e.message;
+    if(!MODEL){ $('teamGrid').innerHTML = '<div class="empty-grid">Sin datos todavía. Probá de nuevo con “Sincronizar Jira”.</div>'; }
+  }finally{
+    btn.disabled = false; btn.classList.remove('loading');
+  }
+}
+
+/* Guarda el resumen para que la card del portal (index.html) muestre los números */
+function guardarResumen(){
+  try{
+    const r = MODEL.resumen;
+    localStorage.setItem('equipoResumen', JSON.stringify({
+      abiertas: r.total, vencidas: r.vencidas, sobrecarga: r.sobrecarga, libres: r.libres.length,
+      fecha: (LAST_SYNC || new Date()).toISOString()
+    }));
+  }catch(_){}
+}
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+function renderTodo(){ renderRadar(); }
+
+function chipsHtml(por, order){
+  const keys = Object.keys(por);
+  if(!keys.length) return '<span class="chip-empty">sin tareas</span>';
+  return order.filter(k=>por[k]).concat(keys.filter(k=>!order.includes(k)))
+    .map(k => `<span class="chip"><b>${por[k]}</b> ${esc(k)}</span>`).join('');
+}
+
+const FILTROS = {
+  todos:    {fn: p => true, txt: null},
+  web:      {fn: p => p.webTotal > 0, txt: 'Mostrando personas con tareas en WEB'},
+  dig:      {fn: p => p.digTotal > 0, txt: 'Mostrando personas con tareas en DIG'},
+  vencidas: {fn: p => p.vencidas.length > 0, txt: 'Mostrando personas con tareas vencidas, de más a menos vencidas'},
+  libres:   {fn: p => p.total === 0, txt: 'Mostrando personas sin tareas abiertas'}
+};
+
+function renderRadar(){
+  if(!MODEL) return;
+  const r = MODEL.resumen, P = MODEL.personas, n = TEAM.length;
+  $('syncWhen').textContent = LAST_SYNC ? fmtDateTime(LAST_SYNC) : '—';
+  $('kTotal').textContent = r.total; $('kWeb').textContent = r.web; $('kDig').textContent = r.dig;
+  $('kLate').textContent = r.vencidas; $('kLateSub').textContent = `en ${r.conVencidas} de ${n} personas`;
+  $('kFree').textContent = r.libres.length; $('kFreeSub').textContent = `de ${n} personas`;
+  document.querySelectorAll('.kpi').forEach(k => k.classList.toggle('active', k.dataset.f === FILTRO && FILTRO !== 'todos'));
+
+  const note = $('filterNote');
+  if(FILTROS[FILTRO].txt){ note.hidden = false; note.innerHTML = `${FILTROS[FILTRO].txt} · <button type="button" id="clearF">Quitar filtro</button>`; $('clearF').onclick = () => { FILTRO='todos'; renderRadar(); }; }
+  else note.hidden = true;
+
+  let lista = Object.values(P).filter(FILTROS[FILTRO].fn);
+  lista.sort(FILTRO === 'vencidas' ? (a,b)=>b.vencidas.length-a.vencidas.length || b.total-a.total : (a,b)=>b.total-a.total);
+  const hoy = startOfDay(new Date());
+  $('teamGrid').innerHTML = lista.length ? lista.map(p => {
+    const lc = p.total >= 8 ? 'high' : p.total >= 5 ? 'mid' : 'low';
+    let stale = '';
+    if(p.masVieja){
+      const d = diffDays(p.masVieja.actualizada, hoy);
+      const sc = d > 20 ? 'stale' : d > 7 ? 'warm' : 'fresh';
+      stale = `<span class="stale"><span class="dot ${sc}"></span>${esc(p.masVieja.key)} · ${d} d sin tocar</span>`;
+    }
+    const late = p.vencidas.length ? `<span class="late-pill">⚠ ${p.vencidas.length} vencida${p.vencidas.length>1?'s':''}</span>` : `<span class="ok-pill">Sin vencidas</span>`;
+    return `<button class="card" type="button" data-p="${esc(p.short)}">
+      <div class="card-head"><div><div class="name">${esc(p.short)}</div><div class="fullname">${esc(p.full)}</div></div>
+      <div class="load-badge ${lc} num">${p.total}</div></div>
+      <div class="proj-row"><span class="tag web">WEB</span><div class="chips">${chipsHtml(p.web, WEB_ORDER)}</div></div>
+      <div class="proj-row"><span class="tag dig">DIG</span><div class="chips">${chipsHtml(p.dig, DIG_ORDER)}</div></div>
+      <div class="card-foot">${late}${stale}</div>
+    </button>`;
+  }).join('') : `<div class="empty-grid">Nadie cumple este filtro en esta sincronización.</div>`;
+  document.querySelectorAll('.card[data-p]').forEach(c => c.onclick = () => abrirPersona(c.dataset.p));
+
+  const rows = Object.entries(r.dist).map(([k,c]) => { const [proj,estado]=k.split('|'); return {proj,estado,c}; });
+  const max = Math.max(1, ...rows.map(x=>x.c));
+  const ord = {WEB:WEB_ORDER, DIG:DIG_ORDER};
+  rows.sort((a,b) => a.proj!==b.proj ? (a.proj==='WEB'?-1:1) : ord[a.proj].indexOf(a.estado)-ord[b.proj].indexOf(b.estado));
+  $('distCard').innerHTML = rows.map(x => `<div class="dist-row">
+    <div class="lbl"><span class="sw ${x.proj.toLowerCase()}"></span>${x.proj} · ${esc(x.estado)}</div>
+    <div class="track"><div class="fill ${x.proj.toLowerCase()}" style="width:${(x.c/max*100).toFixed(1)}%"></div></div>
+    <div class="cnt num">${x.c}</div></div>`).join('');
+  $('distHint').textContent = `${r.total} tareas abiertas en total`;
+  const fueraTxt = Object.entries(r.fuera).sort((a,b)=>b[1]-a[1]).map(([n,c])=>`${n} (${c})`).join(', ');
+  $('footExtra').textContent = `No incluidas en el radar: ${r.sinAsignar} tareas abiertas sin asignar` + (fueraTxt ? ` · asignadas a personas fuera del equipo: ${fueraTxt}` : '') + (r.sinImpl ? ` · ${r.sinImpl} en "Finalizada tarea"` : '') + '.';
+}
+
+/* ---------- Drawer de persona ---------- */
+function mesesRango(modo){
+  const hoy = new Date(); const out = [];
+  const desde = modo === 'creacion' ? -5 : -3, hasta = modo === 'creacion' ? 0 : 2;
+  for(let i=desde;i<=hasta;i++){
+    const d = new Date(hoy.getFullYear(), hoy.getMonth()+i, 1);
+    out.push({key: ym(d), label: MESES[d.getMonth()].charAt(0).toUpperCase()+MESES[d.getMonth()].slice(1), now: i===0, pasado: i<0});
+  }
+  return out;
+}
+
+function chartHtml(p){
+  const meses = mesesRango(CHART_MODO);
+  const data = meses.map(m => ({m, g:{}, tot:0}));
+  p.abiertas.concat(p.cerradas).forEach(t => {
+    const d = CHART_MODO === 'creacion' ? t.creada : t.vence;
+    if(!d) return;
+    const b = data.find(x => x.m.key === ym(d)); if(!b) return;
+    const g = grupo(t); b.g[g] = (b.g[g]||0)+1; b.tot++;
+  });
+  const max = Math.max(1, ...data.map(x=>x.tot));
+  // Rendimiento = tareas en estado de fin / total del mes.
+  // En modo vencimiento, los meses futuros no se evalúan (todavía no vencieron).
+  const evaluable = x => !(CHART_MODO === 'vencimiento' && !x.m.pasado && !x.m.now);
+  const pctCls = v => v >= 70 ? 'hi' : v >= 40 ? 'mid' : 'lo';
+  let sumDone = 0, sumTot = 0;
+  const cols = data.map(x => {
+    const done = x.g[FIN] || 0;
+    const segs = GRUPOS.filter(g=>x.g[g.k]).map(g =>
+      `<div class="seg-bar" style="height:${x.g[g.k]/max*140}px;background:${g.c}" title="${g.k}: ${x.g[g.k]}"></div>`).join('');
+    let pctHtml = '<div class="pct na">&nbsp;</div>';
+    if(x.tot && evaluable(x)){
+      const v = Math.round(done / x.tot * 100);
+      sumDone += done; sumTot += x.tot;
+      pctHtml = `<div class="pct ${pctCls(v)} num">${v}%</div>`;
+    } else if(x.tot){
+      pctHtml = `<div class="pct na" title="Todavía no venció">—</div>`;
+    }
+    return `<div class="col">${pctHtml}<div class="tot num">${x.tot ? done + '/' + x.tot : ''}</div>
+      <div class="stack" style="${x.tot?'':'background:transparent'}">${segs}</div>
+      <div class="m ${x.m.now?'now':''}">${x.m.label}${x.m.now?' •':''}</div></div>`;
+  }).join('');
+  const total = sumTot ? Math.round(sumDone / sumTot * 100) : null;
+  const resumen = total === null
+    ? `<div class="perf"><div class="perf-v na">—</div><div class="perf-t">Sin tareas en el período</div></div>`
+    : `<div class="perf"><div class="perf-v ${pctCls(total)} num">${total}%</div>
+        <div class="perf-t"><b>Rendimiento del período</b><br>${sumDone} de ${sumTot} tareas en estado de fin</div>
+        <div class="perf-bar"><div class="${pctCls(total)}" style="width:${total}%"></div></div></div>`;
+  const legend = GRUPOS.map(g => `<span><i style="background:${g.c}"></i>${g.k}</span>`).join('');
+  const nota = CHART_MODO === 'creacion'
+    ? 'Tareas creadas cada mes, coloreadas según su estado actual. El % indica cuántas de esas tareas ya llegaron a un estado de fin.'
+    : 'Tareas según su mes de vencimiento. El % indica cuántas se cerraron; en meses pasados, lo que no está en verde quedó vencido. Los meses futuros no se evalúan.';
+  return `<div class="seg" role="tablist">
+      <button type="button" data-m="creacion" class="${CHART_MODO==='creacion'?'on':''}">Por mes de creación</button>
+      <button type="button" data-m="vencimiento" class="${CHART_MODO==='vencimiento'?'on':''}">Por mes de vencimiento</button>
+    </div>
+    ${resumen}
+    <div class="chart">${cols}</div>
+    <div class="legend">${legend}</div>
+    <div class="chart-note">${nota}</div>`;
+}
+
+function tareaRow(t, modo){
+  const hoy = startOfDay(new Date());
+  let right = '';
+  if(modo === 'vencida') right = `<div class="t-days">${t.atraso} d</div>`;
+  else if(t.vence) right = `<div class="t-days ${t.vence>=hoy?'future':''}">${t.vence<hoy?'vencida':'vence '+fmtDay(t.vence)}</div>`;
+  else right = `<div class="t-days future">sin fecha</div>`;
+  const meta = modo === 'vencida' ? `${esc(t.estado)} · venció el ${fmtDay(t.vence)}` : esc(t.estado);
+  return `<div class="trow"><span class="tag ${t.proyecto==='WEB'?'web':'dig'}">${esc(t.key)}</span>
+    <div><div class="t-title">${esc(t.titulo)}</div><div class="t-meta">${meta}</div></div>${right}</div>`;
+}
+
+function abrirPersona(short){
+  const p = MODEL.personas[short]; if(!p) return;
+  OPEN_P = short;
+  const hace6 = new Date(new Date().getFullYear(), new Date().getMonth()-5, 1);
+  const cerr6 = p.cerradas.filter(t => (t.resuelta||t.actualizada) >= hace6).length;
+  const pausa = p.abiertas.filter(t => t.estado === 'En pausa').length;
+  $('drawer').innerHTML = `
+    <div class="d-head">
+      <div><h2>${esc(p.short)}</h2><div class="fullname">${esc(p.full)}</div></div>
+      <button class="close" type="button" id="closeD" aria-label="Cerrar">×</button>
+    </div>
+    <div class="d-body">
+      <div class="d-stats">
+        <div class="d-stat"><div class="v num">${p.total}</div><div class="l">Abiertas</div></div>
+        <div class="d-stat late"><div class="v num">${p.vencidas.length}</div><div class="l">Vencidas</div></div>
+        <div class="d-stat pause"><div class="v num">${pausa}</div><div class="l">En pausa</div></div>
+        <div class="d-stat done"><div class="v num">${cerr6}</div><div class="l">Cerradas (6 meses)</div></div>
+      </div>
+
+      <div class="panel">
+        <h3>Tareas vencidas ${p.vencidas.length?`<span class="count-badge">${p.vencidas.length}</span>`:''}</h3>
+        <span class="hint">Abiertas con fecha de vencimiento anterior a hoy · ordenadas por días de atraso</span>
+        ${p.vencidas.length ? `<div class="row-list">${p.vencidas.map(t=>tareaRow(t,'vencida')).join('')}</div>` : `<div class="ok-box">✓ Sin tareas vencidas</div>`}
+      </div>
+
+      <div class="panel">
+        <h3>Tareas por estado y mes</h3>
+        <span class="hint">WEB + DIG combinados · estados agrupados según el flujo de Jira</span>
+        <div id="chartBox">${chartHtml(p)}</div>
+      </div>
+    </div>`;
+  $('drawerBg').hidden = false;
+  $('closeD').onclick = cerrarPersona;
+  bindChart(p);
+}
+function bindChart(p){
+  document.querySelectorAll('#chartBox .seg button').forEach(b => b.onclick = () => {
+    CHART_MODO = b.dataset.m; $('chartBox').innerHTML = chartHtml(p); bindChart(p);
+  });
+}
+function cerrarPersona(){ $('drawerBg').hidden = true; OPEN_P = null; }
+$('drawerBg').addEventListener('click', e => { if(e.target.id === 'drawerBg') cerrarPersona(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape') cerrarPersona(); });
+
+/* ---------- Eventos ---------- */
+document.querySelectorAll('.kpi').forEach(k => k.onclick = () => { FILTRO = (FILTRO === k.dataset.f) ? 'todos' : k.dataset.f; renderRadar(); });
+$('syncBtn').onclick = () => sincronizar(false);
+
+/* ---------- Sesión (mismo Supabase que index.html) ---------- */
+const SUPABASE_URL = 'https://qszzabybiieolnajaszk.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzenphYnliaWllb2xuYWphc3prIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEwNjUyMTQsImV4cCI6MjA5NjY0MTIxNH0.8If32to25vLkIvEP0NpaI1T9RDRLp_wP7DrI1Q5yJPA';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+(async function iniciar(){
+  const { data: { session } } = await sb.auth.getSession();
+  if(!session){ location.href = 'index.html'; return; }
+  $('userEmail').textContent = session.user.email;
+  sincronizar(true);
+})();
+$('logoutBtn').onclick = async () => { await sb.auth.signOut(); location.href = 'index.html'; };
+sb.auth.onAuthStateChange(ev => { if(ev === 'SIGNED_OUT') location.href = 'index.html'; });
+</script>
+</body>
+</html>
