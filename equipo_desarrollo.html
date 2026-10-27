@@ -19,7 +19,7 @@
     --late:#B42318; --late-soft:#FCE6E3;
     --warn:#B76E00; --warn-soft:#FBEFD8;
     --ok:#2E7D32; --ok-soft:#E4F2E5;
-    --s-todo:#D6CFC1; --s-prog:#1A56A6; --s-rev:#8A3FF0; --s-pause:#8FB0E0; --s-test:#D9912A; --s-done:#2E7D32;
+    --s-todo:#D6CFC1; --s-prog:#1A56A6; --s-rev:#8A3FF0; --s-pause:#8FB0E0; --s-test:#D9912A; --s-fin:#A9D5A4; --s-done:#2E7D32;
     --shadow:0 1px 2px rgba(30,25,15,.04), 0 12px 30px -20px rgba(30,25,15,.22);
   }
   *{box-sizing:border-box;}
@@ -133,6 +133,16 @@
   .fill{height:100%; border-radius:5px;}
   .fill.web{background:var(--web);} .fill.dig{background:var(--app);}
   .cnt{font-size:.83rem; font-weight:800; text-align:right;}
+  .top3{display:grid; grid-template-columns:repeat(3,1fr); gap:12px;}
+  .top-card{background:var(--surface); border:1.5px solid var(--border); border-radius:16px; padding:16px 18px; box-shadow:var(--shadow); display:flex; align-items:center; gap:14px; cursor:pointer; text-align:left; transition:border-color .15s, transform .15s;}
+  .top-card:hover{border-color:var(--team); transform:translateY(-1px);}
+  .top-card .medal{font-size:2rem; line-height:1;}
+  .top-card .tn{font-weight:800; font-size:1rem;}
+  .top-card .tf{font-size:.74rem; color:var(--faint);}
+  .top-card .tv{margin-left:auto; text-align:right;}
+  .top-card .tv b{display:block; font-size:1.7rem; font-weight:800; color:var(--ok); line-height:1;}
+  .top-card .tv span{font-size:.72rem; color:var(--muted);}
+  @media (max-width:760px){ .top3{grid-template-columns:1fr;} }
   footer{font-size:.76rem; color:var(--faint); padding-bottom:40px;}
 
   /* ============ DRAWER ============ */
@@ -179,6 +189,12 @@
   .perf-bar .hi{background:var(--ok);} .perf-bar .mid{background:var(--warn);} .perf-bar .lo{background:var(--late);}
   .stack{width:min(46px,80%); display:flex; flex-direction:column-reverse; border-radius:7px; overflow:hidden; background:var(--surface-2); min-height:3px;}
   .seg-bar{width:100%;}
+  .pair{display:flex; gap:4px; align-items:flex-end; height:100%;}
+  .pbar{display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:3px; height:100%;}
+  .pv{font-size:.7rem; font-weight:700; color:var(--muted);}
+  .bar{width:22px; border-radius:5px; min-height:2px;}
+  .bar.ini{background:var(--s-todo);}
+  .bar.term{display:flex; flex-direction:column; overflow:hidden; background:transparent;}
   .col .m{font-size:.78rem; color:var(--muted); font-weight:700;}
   .col .m.now{color:var(--text);}
   .legend{display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:14px; font-size:.78rem; color:var(--muted);}
@@ -257,7 +273,15 @@
     <div class="dist-card" id="distCard"></div>
   </section>
 
-  <footer>Estados de fin (salida a producción): Finalizado, Beta, Publicado, Implementado Prod — no cuentan como carga activa. "Finalizada tarea" (cierre sin implementación) no cuenta como carga ni entra en el rendimiento. Vencida = tarea abierta con fecha de vencimiento anterior a hoy.<br><span id="footExtra"></span></footer>
+  <section>
+    <div class="section-head">
+      <h2>🏆 Top 3 · Más tareas en producción</h2>
+      <div class="hint" id="topHint">últimos 6 meses · tareas que llegaron a un estado de fin</div>
+    </div>
+    <div class="top3" id="top3"></div>
+  </section>
+
+  <footer>Rendimiento, "En producción" y Top 3 cuentan solo Publicado e Implementado Prod. Finalizado y Beta no cuentan como carga activa del desarrollador, pero tampoco suman al rendimiento. "Finalizada tarea" (cierre sin implementación) no cuenta como carga ni entra en el rendimiento. Vencida = tarea abierta con fecha de vencimiento anterior a hoy.<br><span id="footExtra"></span></footer>
 </main>
 
 <!-- ================= DRAWER ================= -->
@@ -302,7 +326,9 @@ const CANON = {
   'finalizada tarea':'Finalizada tarea'
 };
 const canon = s => CANON[norm(s).replace(/\s+/g,' ')] || String(s||'').trim();
-const DONE = new Set(['Finalizado','Beta','Publicado','Implementado Prod']);        // verdes = estados de fin
+const DONE = new Set(['Finalizado','Beta','Publicado','Implementado Prod']);        // fuera de la carga activa del desarrollador
+const PROD = new Set(['Publicado','Implementado Prod']);                             // únicos que cuentan para el rendimiento
+const FIN_PEND = 'Finalizado / Beta';
 const CERRADA_SIN_IMPL = new Set(['Finalizada tarea']);                              // transversal
 const ORDER = ['Backlog','Por hacer','En progreso','En curso','En pausa','Pend. revisión','Revisión','Pend. prueba','Prueba','Control de calidad'];
 const WEB_ORDER = ORDER, DIG_ORDER = ORDER;
@@ -310,7 +336,7 @@ const FIN = 'Salida a producción';
 const GRUPOS = [
   {k:'Planificación', c:'var(--s-todo)'}, {k:'Desarrollo', c:'var(--s-prog)'},
   {k:'En pausa', c:'var(--s-pause)'}, {k:'Revisión de código', c:'var(--s-rev)'},
-  {k:'Pruebas funcionales', c:'var(--s-test)'}, {k:FIN, c:'var(--s-done)'}
+  {k:'Pruebas funcionales', c:'var(--s-test)'}, {k:FIN_PEND, c:'var(--s-fin)'}, {k:FIN, c:'var(--s-done)'}
 ];
 const GRUPO_DE = {'Backlog':'Planificación','Por hacer':'Planificación','En progreso':'Desarrollo','En curso':'Desarrollo','En pausa':'En pausa',
   'Pend. revisión':'Revisión de código','Revisión':'Revisión de código','Pend. prueba':'Pruebas funcionales','Prueba':'Pruebas funcionales','Control de calidad':'Pruebas funcionales'};
@@ -332,7 +358,7 @@ const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
 const ym = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
 const fmtDay = d => `${d.getDate()} ${MESES[d.getMonth()]}`;
 const fmtDateTime = d => `${d.getDate()} ${MESES[d.getMonth()]} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-const grupo = t => t.done ? FIN : (GRUPO_DE[t.estado] || 'Planificación');
+const grupo = t => t.done ? (PROD.has(t.estado) ? FIN : FIN_PEND) : (GRUPO_DE[t.estado] || 'Planificación');
 
 let toastT;
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),3200); }
@@ -457,6 +483,9 @@ const FILTROS = {
   libres:   {fn: p => p.total === 0, txt: 'Mostrando personas sin tareas abiertas'}
 };
 
+const inicioPeriodo6 = () => new Date(new Date().getFullYear(), new Date().getMonth()-5, 1);
+const cerradas6 = (p, desde) => p.cerradas.filter(t => PROD.has(t.estado) && (t.resuelta||t.actualizada) >= desde).length;
+
 function renderRadar(){
   if(!MODEL) return;
   const r = MODEL.resumen, P = MODEL.personas, n = TEAM.length;
@@ -501,6 +530,20 @@ function renderRadar(){
     <div class="track"><div class="fill ${x.proj.toLowerCase()}" style="width:${(x.c/max*100).toFixed(1)}%"></div></div>
     <div class="cnt num">${x.c}</div></div>`).join('');
   $('distHint').textContent = `${r.total} tareas abiertas en total`;
+
+  // Top 3: más tareas cerradas en los últimos 6 meses (mismo criterio que el panel de cada persona)
+  const desde6 = inicioPeriodo6();
+  const ranking = Object.values(P).map(p => ({p, n: cerradas6(p, desde6)})).filter(x => x.n > 0)
+    .sort((a,b) => b.n - a.n || a.p.total - b.p.total).slice(0,3);
+  const medallas = ['🥇','🥈','🥉'];
+  $('top3').innerHTML = ranking.length ? ranking.map((x,i) => `
+    <button class="top-card" type="button" data-p="${esc(x.p.short)}">
+      <span class="medal">${medallas[i]}</span>
+      <div><div class="tn">${esc(x.p.short)}</div><div class="tf">${esc(x.p.full)}</div></div>
+      <div class="tv"><b class="num">${x.n}</b><span>en producción</span></div>
+    </button>`).join('') : '<div class="empty-grid">Sin tareas cerradas en los últimos 6 meses.</div>';
+  $('top3').querySelectorAll('.top-card').forEach(c => c.onclick = () => abrirPersona(c.dataset.p));
+  $('topHint').textContent = `desde ${fmtDay(desde6)} ${desde6.getFullYear()} · Publicado o Implementado Prod`;
   const fueraTxt = Object.entries(r.fuera).sort((a,b)=>b[1]-a[1]).map(([n,c])=>`${n} (${c})`).join(', ');
   $('footExtra').textContent = `No incluidas en el radar: ${r.sinAsignar} tareas abiertas sin asignar` + (fueraTxt ? ` · asignadas a personas fuera del equipo: ${fueraTxt}` : '') + (r.sinImpl ? ` · ${r.sinImpl} en "Finalizada tarea"` : '') + '.';
 }
@@ -516,55 +559,53 @@ function mesesRango(modo){
   return out;
 }
 
+/* Iniciadas vs terminadas por mes (últimos 6 meses)
+   - Iniciadas: tareas creadas en el mes que ya salieron de Backlog (Por hacer en adelante)
+   - Terminadas: tareas que se cerraron en el mes (fecha de resolución), según su estado actual
+       · verde oscuro = Publicado o Implementado Prod (cuenta para el rendimiento)
+       · verde claro  = Finalizado o Beta (terminada por desarrollo, aún sin salir a producción)
+   - Rendimiento del mes = en producción / iniciadas */
 function chartHtml(p){
-  const meses = mesesRango(CHART_MODO);
-  const data = meses.map(m => ({m, g:{}, tot:0}));
-  p.abiertas.concat(p.cerradas).forEach(t => {
-    const d = CHART_MODO === 'creacion' ? t.creada : t.vence;
-    if(!d) return;
-    const b = data.find(x => x.m.key === ym(d)); if(!b) return;
-    const g = grupo(t); b.g[g] = (b.g[g]||0)+1; b.tot++;
+  const meses = mesesRango('creacion');
+  const data = meses.map(m => ({m, ini:0, fin:0, prod:0}));
+  const find = d => d ? data.find(x => x.m.key === ym(d)) : null;
+  p.abiertas.concat(p.cerradas).forEach(t => { if(t.estado === 'Backlog') return; const b = find(t.creada); if(b) b.ini++; });
+  p.cerradas.forEach(t => {
+    const b = find(t.resuelta || t.actualizada); if(!b) return;
+    if(PROD.has(t.estado)) b.prod++; else b.fin++;
   });
-  const max = Math.max(1, ...data.map(x=>x.tot));
-  // Rendimiento = tareas en estado de fin / total del mes.
-  // En modo vencimiento, los meses futuros no se evalúan (todavía no vencieron).
-  const evaluable = x => !(CHART_MODO === 'vencimiento' && !x.m.pasado && !x.m.now);
+  const max = Math.max(1, ...data.map(x => Math.max(x.ini, x.fin + x.prod)));
+  const H = 150;
   const pctCls = v => v >= 70 ? 'hi' : v >= 40 ? 'mid' : 'lo';
-  let sumDone = 0, sumTot = 0;
+  let sIni = 0, sProd = 0, sFin = 0;
   const cols = data.map(x => {
-    const done = x.g[FIN] || 0;
-    const segs = GRUPOS.filter(g=>x.g[g.k]).map(g =>
-      `<div class="seg-bar" style="height:${x.g[g.k]/max*140}px;background:${g.c}" title="${g.k}: ${x.g[g.k]}"></div>`).join('');
-    let pctHtml = '<div class="pct na">&nbsp;</div>';
-    if(x.tot && evaluable(x)){
-      const v = Math.round(done / x.tot * 100);
-      sumDone += done; sumTot += x.tot;
-      pctHtml = `<div class="pct ${pctCls(v)} num">${v}%</div>`;
-    } else if(x.tot){
-      pctHtml = `<div class="pct na" title="Todavía no venció">—</div>`;
-    }
-    return `<div class="col">${pctHtml}<div class="tot num">${x.tot ? done + '/' + x.tot : ''}</div>
-      <div class="stack" style="${x.tot?'':'background:transparent'}">${segs}</div>
+    sIni += x.ini; sProd += x.prod; sFin += x.fin;
+    const term = x.fin + x.prod;
+    let pct = '<div class="pct na">&nbsp;</div>';
+    if(x.ini){ const v = Math.round(x.prod / x.ini * 100); pct = `<div class="pct ${pctCls(v)} num">${v}%</div>`; }
+    else if(x.prod){ pct = '<div class="pct hi">↑</div>'; }
+    return `<div class="col">${pct}
+      <div class="pair">
+        <div class="pbar"><span class="pv num">${x.ini || ''}</span><div class="bar ini" style="height:${x.ini/max*H}px" title="Iniciadas: ${x.ini}"></div></div>
+        <div class="pbar"><span class="pv num">${term || ''}</span>
+          <div class="bar term" style="height:${term/max*H}px">
+            <div style="height:${term ? x.fin/term*100 : 0}%;background:var(--s-fin)" title="Finalizado / Beta: ${x.fin}"></div>
+            <div style="height:${term ? x.prod/term*100 : 0}%;background:var(--s-done)" title="Publicado / Implementado Prod: ${x.prod}"></div>
+          </div></div>
+      </div>
       <div class="m ${x.m.now?'now':''}">${x.m.label}${x.m.now?' •':''}</div></div>`;
   }).join('');
-  const total = sumTot ? Math.round(sumDone / sumTot * 100) : null;
+  const total = sIni ? Math.round(sProd / sIni * 100) : null;
   const resumen = total === null
-    ? `<div class="perf"><div class="perf-v na">—</div><div class="perf-t">Sin tareas en el período</div></div>`
-    : `<div class="perf"><div class="perf-v ${pctCls(total)} num">${total}%</div>
-        <div class="perf-t"><b>Rendimiento del período</b><br>${sumDone} de ${sumTot} tareas en estado de fin</div>
-        <div class="perf-bar"><div class="${pctCls(total)}" style="width:${total}%"></div></div></div>`;
-  const legend = GRUPOS.map(g => `<span><i style="background:${g.c}"></i>${g.k}</span>`).join('');
-  const nota = CHART_MODO === 'creacion'
-    ? 'Tareas creadas cada mes, coloreadas según su estado actual. El % indica cuántas de esas tareas ya llegaron a un estado de fin.'
-    : 'Tareas según su mes de vencimiento. El % indica cuántas se cerraron; en meses pasados, lo que no está en verde quedó vencido. Los meses futuros no se evalúan.';
-  return `<div class="seg" role="tablist">
-      <button type="button" data-m="creacion" class="${CHART_MODO==='creacion'?'on':''}">Por mes de creación</button>
-      <button type="button" data-m="vencimiento" class="${CHART_MODO==='vencimiento'?'on':''}">Por mes de vencimiento</button>
-    </div>
-    ${resumen}
-    <div class="chart">${cols}</div>
-    <div class="legend">${legend}</div>
-    <div class="chart-note">${nota}</div>`;
+    ? `<div class="perf"><div class="perf-v na">—</div><div class="perf-t">Sin tareas iniciadas en el período</div></div>`
+    : `<div class="perf"><div class="perf-v ${pctCls(total)} num">${Math.min(total,999)}%</div>
+        <div class="perf-t"><b>Rendimiento del período</b><br>${sIni} iniciadas · <b style="color:var(--s-done)">${sProd} en producción</b> · ${sFin} finalizadas sin publicar</div>
+        <div class="perf-bar"><div class="${pctCls(total)}" style="width:${Math.min(total,100)}%"></div></div></div>`;
+  const legend = `<span><i style="background:var(--s-todo)"></i>Iniciadas</span>
+    <span><i style="background:var(--s-done)"></i>Publicado / Implementado Prod</span>
+    <span><i style="background:var(--s-fin)"></i>Finalizado / Beta</span>`;
+  return `${resumen}<div class="chart">${cols}</div><div class="legend">${legend}</div>
+    <div class="chart-note">Por cada mes: tareas <b>iniciadas</b> (creadas, desde Por hacer en adelante; Backlog no cuenta) contra tareas <b>terminadas</b> (cerradas ese mes). El % es cuántas llegaron a producción (Publicado o Implementado Prod) sobre las iniciadas; si supera 100%, ese mes se cerró más de lo que entró.</div>`;
 }
 
 function tareaRow(t, modo){
@@ -581,8 +622,7 @@ function tareaRow(t, modo){
 function abrirPersona(short){
   const p = MODEL.personas[short]; if(!p) return;
   OPEN_P = short;
-  const hace6 = new Date(new Date().getFullYear(), new Date().getMonth()-5, 1);
-  const cerr6 = p.cerradas.filter(t => (t.resuelta||t.actualizada) >= hace6).length;
+  const cerr6 = cerradas6(p, inicioPeriodo6());
   const pausa = p.abiertas.filter(t => t.estado === 'En pausa').length;
   $('drawer').innerHTML = `
     <div class="d-head">
@@ -594,7 +634,7 @@ function abrirPersona(short){
         <div class="d-stat"><div class="v num">${p.total}</div><div class="l">Abiertas</div></div>
         <div class="d-stat late"><div class="v num">${p.vencidas.length}</div><div class="l">Vencidas</div></div>
         <div class="d-stat pause"><div class="v num">${pausa}</div><div class="l">En pausa</div></div>
-        <div class="d-stat done"><div class="v num">${cerr6}</div><div class="l">Cerradas (6 meses)</div></div>
+        <div class="d-stat done"><div class="v num">${cerr6}</div><div class="l">En producción (6 meses)</div></div>
       </div>
 
       <div class="panel">
@@ -604,8 +644,8 @@ function abrirPersona(short){
       </div>
 
       <div class="panel">
-        <h3>Tareas por estado y mes</h3>
-        <span class="hint">WEB + DIG combinados · estados agrupados según el flujo de Jira</span>
+        <h3>Iniciadas vs terminadas por mes</h3>
+        <span class="hint">WEB + DIG combinados · últimos 6 meses</span>
         <div id="chartBox">${chartHtml(p)}</div>
       </div>
     </div>`;
@@ -613,11 +653,7 @@ function abrirPersona(short){
   $('closeD').onclick = cerrarPersona;
   bindChart(p);
 }
-function bindChart(p){
-  document.querySelectorAll('#chartBox .seg button').forEach(b => b.onclick = () => {
-    CHART_MODO = b.dataset.m; $('chartBox').innerHTML = chartHtml(p); bindChart(p);
-  });
-}
+function bindChart(p){}
 function cerrarPersona(){ $('drawerBg').hidden = true; OPEN_P = null; }
 $('drawerBg').addEventListener('click', e => { if(e.target.id === 'drawerBg') cerrarPersona(); });
 document.addEventListener('keydown', e => { if(e.key === 'Escape') cerrarPersona(); });
